@@ -509,6 +509,7 @@ export async function publishToTwitter(article: DraftArticle, blogUrl: string): 
     const data = await res.json();
 
     if (!res.ok) {
+      console.error('[X ERROR DEBUG]', JSON.stringify(data, null, 2));
       throw new Error(data.detail || data.title || JSON.stringify(data.errors) || 'Failed to post tweet');
     }
 

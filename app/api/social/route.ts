@@ -6,6 +6,7 @@ import type { Post } from '@/lib/types';
 export async function POST(request: Request) {
   try {
     const { postId, platform, slug } = await request.json();
+    const origin = request.headers.get('origin') || `http://${request.headers.get('host')}` || 'http://localhost:3000';
 
     if (!slug || !platform) {
       return NextResponse.json({ success: false, error: 'Missing slug or platform' }, { status: 400 });
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
 
     // 2. Trigger the agent
     if (platform === 'twitter') {
-      result = await publishToTwitter(article, `${request.headers.get('origin')}/blog/${post.slug}`);
+      result = await publishToTwitter(article, `${origin}/blog/${post.slug}`);
     } else if (platform === 'instagram') {
       result = await publishToInstagram(article);
     } else {
