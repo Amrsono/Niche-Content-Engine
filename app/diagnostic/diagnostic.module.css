@@ -1,0 +1,114 @@
+.main {
+  min-height: 100vh;
+  padding: 160px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  max-width: 800px;
+  width: 100%;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.title {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  color: #a0aab5;
+  font-size: 1rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 800px;
+}
+
+.controlHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.controlHeader h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.testBtn {
+  background: var(--accent-1);
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s;
+}
+
+.testBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modelList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modelRow {
+  display: grid;
+  grid-template-columns: 200px 40px 1fr;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  gap: 16px;
+}
+
+.modelName {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent-1);
+}
+
+.message {
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.errorMsg {
+  background: rgba(255, 77, 77, 0.1);
+  color: #ff4d4d;
+  border: 1px solid rgba(255, 77, 77, 0.2);
+}
+
+.successMsg {
+  background: rgba(0, 255, 170, 0.1);
+  color: #00ffaa;
+  border: 1px solid rgba(0, 255, 170, 0.2);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--accent-1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

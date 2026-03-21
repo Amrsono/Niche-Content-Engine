@@ -1,0 +1,220 @@
+.main {
+  min-height: 100vh;
+  padding: 160px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  max-width: 1200px;
+  width: 100%;
+  margin-bottom: 40px;
+}
+
+.titleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 3rem;
+  margin: 0;
+}
+
+.liveBadge {
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--accent-1);
+  color: var(--accent-1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.subtitle {
+  color: #a0aab5;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 40px;
+}
+
+.metricHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.iconBox {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.positive {
+  color: #00ffaa;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.negative {
+  color: #ff4d4d;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metricTitle {
+  color: #a0aab5;
+  font-size: 0.9rem;
+  margin: 0 0 8px 0;
+  font-variation-settings: "wght" 500;
+}
+
+.metricValue {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 8fr 4fr;
+  gap: 24px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.chartContainer {
+  min-height: 400px;
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.chartTabs {
+  display: flex;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.chartTabs button {
+  background: transparent;
+  border: none;
+  color: #a0aab5;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.chartTabs .activeTab {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.chartBody {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+}
+
+.barChart {
+  width: 100%;
+  height: 250px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+
+.bar {
+  flex: 1;
+  background: linear-gradient(180deg, var(--accent-1) 0%, rgba(0, 240, 255, 0.1) 100%);
+  border-radius: 8px 8px 2px 2px;
+  box-shadow: 0 10px 20px rgba(0, 240, 255, 0.1);
+}
+
+.nicheList h3 {
+  margin-bottom: 24px;
+}
+
+.nicheTable {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nicheRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+}
+
+.nicheInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.nicheStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #00ffaa;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  background: #00ffaa;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00ffaa;
+}
+
+@media (max-width: 1024px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}

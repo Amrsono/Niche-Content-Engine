@@ -1,0 +1,107 @@
+:root {
+  --background: #030508; /* Deep dark space */
+  --foreground: #f4f7fa; /* Crisp white-blue for text */
+  --accent-1: #00f0ff;   /* Neon Cyan */
+  --accent-2: #7000ff;   /* Deep Purple */
+  --accent-3: #ff0055;   /* Hot Pink */
+  
+  --glass-bg: rgba(20, 25, 35, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Force Dark Mode */
+html {
+  color-scheme: dark;
+}
+
+/* Micro-Gradients Background */
+body {
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(112, 0, 255, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 50% 10%, rgba(255, 0, 85, 0.05) 0%, transparent 30%),
+    var(--background);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Typography settings for Variable Fonts */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-geist-sans);
+  font-variation-settings: "wght" 800;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  margin-bottom: 0.5em;
+  line-height: 1.1;
+  background: linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+p, span, div, button {
+  font-variation-settings: "wght" 400;
+}
+
+/* Glassmorphism Panel Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glow-shadow);
+}
+
+/* Interactive Glowing Borders */
+.glow-border {
+  position: relative;
+  background: var(--glass-bg);
+  border-radius: 24px;
+}
+.glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 25.5px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  z-index: -1;
+  opacity: 0.3;
+  filter: blur(4px);
+  transition: opacity 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.glow-border:hover::before {
+  opacity: 1;
+  filter: blur(8px);
+}
+
+/* Scrollbar customization for the dashboard */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

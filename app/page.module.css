@@ -1,0 +1,50 @@
+.main {
+  min-height: 100vh;
+  padding: 160px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  max-width: 1200px;
+  width: 100%;
+  margin-bottom: 60px;
+}
+
+.title {
+  font-size: 3.5rem;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #a0aab5;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.analytics {
+  grid-column: span 8;
+}
+
+.heatmap {
+  grid-column: span 4;
+}
+
+.terminal {
+  grid-column: span 12;
+}
+
+@media (max-width: 1024px) {
+  .analytics, .heatmap {
+    grid-column: span 12;
+  }
+}

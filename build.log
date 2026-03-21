@@ -1,0 +1,95 @@
+
+> niche-content-engine@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.2.0 (Turbopack)
+
+ÔÜá The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 4 errors:
+./app/components/FloatingNav.tsx:6:1
+Export SignedIn doesn't exist in target module
+  4 | import { motion } from 'framer-motion';
+  5 | import Link from 'next/link';
+> 6 | import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 | import styles from './FloatingNav.module.css';
+  8 |
+  9 | export function FloatingNav() {
+
+The export SignedIn was not found in module [project]/node_modules/@clerk/nextjs/dist/esm/index.js [app-client] (ecmascript).
+Did you mean to import SignIn?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./app/components/FloatingNav.tsx
+    ./app/page.tsx
+
+
+./app/components/FloatingNav.tsx:6:1
+Export SignedIn doesn't exist in target module
+  4 | import { motion } from 'framer-motion';
+  5 | import Link from 'next/link';
+> 6 | import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 | import styles from './FloatingNav.module.css';
+  8 |
+  9 | export function FloatingNav() {
+
+The export SignedIn was not found in module [project]/node_modules/@clerk/nextjs/dist/esm/index.js [app-ssr] (ecmascript).
+Did you mean to import SignIn?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./app/components/FloatingNav.tsx
+    ./app/page.tsx
+
+
+./app/components/FloatingNav.tsx:6:1
+Export SignedOut doesn't exist in target module
+  4 | import { motion } from 'framer-motion';
+  5 | import Link from 'next/link';
+> 6 | import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 | import styles from './FloatingNav.module.css';
+  8 |
+  9 | export function FloatingNav() {
+
+The export SignedOut was not found in module [project]/node_modules/@clerk/nextjs/dist/esm/index.js [app-client] (ecmascript).
+Did you mean to import SignOutButton?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./app/components/FloatingNav.tsx
+    ./app/page.tsx
+
+
+./app/components/FloatingNav.tsx:6:1
+Export SignedOut doesn't exist in target module
+  4 | import { motion } from 'framer-motion';
+  5 | import Link from 'next/link';
+> 6 | import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 | import styles from './FloatingNav.module.css';
+  8 |
+  9 | export function FloatingNav() {
+
+The export SignedOut was not found in module [project]/node_modules/@clerk/nextjs/dist/esm/index.js [app-ssr] (ecmascript).
+Did you mean to import SignOutButton?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./app/components/FloatingNav.tsx
+    ./app/page.tsx
+
+
+    at <unknown> (./app/components/FloatingNav.tsx:6:1)
+    at <unknown> (./app/components/FloatingNav.tsx:6:1)
+    at <unknown> (./app/components/FloatingNav.tsx:6:1)
+    at <unknown> (./app/components/FloatingNav.tsx:6:1)

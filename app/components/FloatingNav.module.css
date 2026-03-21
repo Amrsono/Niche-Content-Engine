@@ -1,0 +1,81 @@
+.navContainer {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) !important;
+  width: 90%;
+  max-width: 1200px;
+  height: 64px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.logo {
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.1rem;
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--accent-1);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent-1);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(0, 240, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+}
+
+.links {
+  display: flex;
+  gap: 24px;
+}
+
+.link {
+  font-variation-settings: "wght" 400;
+  color: #a0aab5;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.link:hover {
+  font-variation-settings: "wght" 700;
+  color: var(--foreground);
+  text-shadow: 0 0 8px rgba(255,255,255,0.3);
+}
+
+.signInBtn {
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  border: none;
+  padding: 8px 16px;
+  border-radius: 16px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.signInBtn:hover {
+  transform: scale(1.05);
+}
+
+.avatar {
+  border-radius: 50%;
+  border: 2px solid var(--accent-1);
+}
