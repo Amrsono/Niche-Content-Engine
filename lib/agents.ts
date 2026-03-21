@@ -451,7 +451,7 @@ async function generateOAuthHeader(
   return `OAuth ${headerParts}`;
 }
 
-export async function publishToTwitter(article: DraftArticle, blogUrl: string): Promise<PublishResult> {
+export async function publishToTwitter(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
   const apiKey = process.env.TWITTER_API_KEY?.trim();
   const apiSecret = process.env.TWITTER_API_SECRET?.trim();
   const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim();
