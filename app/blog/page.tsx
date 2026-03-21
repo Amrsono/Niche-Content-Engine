@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { usePosts } from '@/lib/useLocalPosts';
 import type { Post } from '@/lib/types';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
-import { Instagram, X, Video } from 'lucide-react';
+import { Instagram, X, Video, Share2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop';
@@ -13,12 +13,34 @@ const FALLBACK_IMG = 'https://images.unsplash.com/photo-1451187580459-43490279c0
 export default function BlogPage() {
   const { posts, refresh } = usePosts();
   const router = useRouter();
+  const [signaling, setSignaling] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const handleUpdate = () => refresh();
     window.addEventListener('posts-updated', handleUpdate);
     return () => window.removeEventListener('posts-updated', handleUpdate);
   }, [refresh]);
+
+  const handleSignal = async (slug: string, platform: 'twitter' | 'instagram') => {
+    try {
+      setSignaling(prev => ({ ...prev, [`${slug}-${platform}`]: true }));
+      const res = await fetch('/api/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, platform })
+      });
+      const data = await res.json();
+      if (data.success) {
+        refresh();
+      } else {
+        alert(`Social Signal Failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Signal Error:', err);
+    } finally {
+      setSignaling(prev => ({ ...prev, [`${slug}-${platform}`]: false }));
+    }
+  };
 
   return (
     <main className={styles.blogContainer}>
@@ -61,18 +83,40 @@ export default function BlogPage() {
                         {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                       <div className={styles.socialLinks} onClick={(e) => e.stopPropagation()}>
-                        {post.instagramUrl && (
-                          <a href={post.instagramUrl} target="_blank" rel="noopener noreferrer" title="View on Instagram">
+                        {post.instagramUrl ? (
+                          <a href={post.instagramUrl} target="_blank" rel="noopener noreferrer" title="View on Instagram" className={styles.socialIconActive}>
                             <Instagram size={18} />
                           </a>
+                        ) : (
+                          <button 
+                            onClick={() => handleSignal(post.slug, 'instagram')}
+                            disabled={signaling[`${post.slug}-instagram`]}
+                            className={styles.signalButton}
+                            title="Signal to Instagram"
+                          >
+                            {signaling[`${post.slug}-instagram`] ? <Loader2 size={14} className={styles.spin} /> : <Instagram size={14} />}
+                            <span>Signal</span>
+                          </button>
                         )}
-                        {post.twitterUrl && (
-                          <a href={post.twitterUrl} target="_blank" rel="noopener noreferrer" title="View on X">
+
+                        {post.twitterUrl ? (
+                          <a href={post.twitterUrl} target="_blank" rel="noopener noreferrer" title="View on X" className={styles.socialIconActive}>
                             <X size={18} />
                           </a>
+                        ) : (
+                          <button 
+                            onClick={() => handleSignal(post.slug, 'twitter')}
+                            disabled={signaling[`${post.slug}-twitter`]}
+                            className={styles.signalButton}
+                            title="Signal to X"
+                          >
+                            {signaling[`${post.slug}-twitter`] ? <Loader2 size={14} className={styles.spin} /> : <X size={14} />}
+                            <span>Signal</span>
+                          </button>
                         )}
+
                         {post.tiktokUrl && (
-                          <a href={post.tiktokUrl} target="_blank" rel="noopener noreferrer" title="View on TikTok">
+                          <a href={post.tiktokUrl} target="_blank" rel="noopener noreferrer" title="View on TikTok" className={styles.socialIconActive}>
                             <Video size={18} />
                           </a>
                         )}

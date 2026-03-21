@@ -2,8 +2,11 @@
   --background: #030508; /* Deep dark space */
   --foreground: #f4f7fa; /* Crisp white-blue for text */
   --accent-1: #00f0ff;   /* Neon Cyan */
+  --accent-1-rgb: 0, 240, 255;
   --accent-2: #7000ff;   /* Deep Purple */
+  --accent-2-rgb: 112, 0, 255;
   --accent-3: #ff0055;   /* Hot Pink */
+  --accent-3-rgb: 255, 0, 85;
   
   --glass-bg: rgba(20, 25, 35, 0.4);
   --glass-border: rgba(255, 255, 255, 0.08);
