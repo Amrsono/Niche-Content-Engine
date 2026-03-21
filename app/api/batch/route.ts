@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToInstagram, publishToTwitter } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 
 export async function POST(request: Request) {
@@ -29,6 +29,10 @@ export async function POST(request: Request) {
         // Publish (Mock for now)
         const publishResult = await publishToWordpress(article);
         
+        // Social Signal - Instagram & X/Twitter
+        const igResult = await publishToInstagram(article);
+        const xResult = await publishToTwitter(article, publishResult.url);
+        
         // Indexing (Fast-Track)
         const indexingResult = await requestIndexing(publishResult.url || `https://yoursite.com/${trend.keyword}`);
         
@@ -36,6 +40,8 @@ export async function POST(request: Request) {
           keyword: trend.keyword,
           title: article.title,
           url: publishResult.url,
+          instagram: igResult.status === 'success' ? igResult.url : igResult.status,
+          twitter: xResult.status === 'success' ? xResult.url : xResult.status,
           indexing: indexingResult.success
         };
       } catch (err: any) {

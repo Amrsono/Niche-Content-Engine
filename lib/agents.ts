@@ -370,6 +370,124 @@ export async function publishToInstagram(article: DraftArticle) {
   }
 }
 
+// ---- X / Twitter Integration (API v2 + OAuth 1.0a) ----
+
+function generateOAuthNonce() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 32; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function percentEncode(str: string) {
+  return encodeURIComponent(str)
+    .replace(/!/g, '%21')
+    .replace(/\*/g, '%2A')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29');
+}
+
+async function hmacSha1(key: string, data: string): Promise<string> {
+  const { createHmac } = await import('crypto');
+  return createHmac('sha1', key).update(data).digest('base64');
+}
+
+async function generateOAuthHeader(
+  method: string,
+  url: string,
+  oauthParams: Record<string, string>,
+  consumerSecret: string,
+  tokenSecret: string
+) {
+  // Build the signature base string
+  const sortedParams = Object.keys(oauthParams).sort().map(k => `${percentEncode(k)}=${percentEncode(oauthParams[k])}`).join('&');
+  const baseString = `${method}&${percentEncode(url)}&${percentEncode(sortedParams)}`;
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`;
+  
+  const signature = await hmacSha1(signingKey, baseString);
+  oauthParams['oauth_signature'] = signature;
+
+  // Build the Authorization header
+  const headerParts = Object.keys(oauthParams).sort().map(k => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`).join(', ');
+  return `OAuth ${headerParts}`;
+}
+
+export async function publishToTwitter(article: DraftArticle, postUrl?: string) {
+  const apiKey = process.env.TWITTER_API_KEY;
+  const apiSecret = process.env.TWITTER_API_SECRET;
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
+  const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET;
+
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
+    console.warn(`[SOCIAL WARNING] X/Twitter credentials missing. Skipping post.`);
+    return { status: "skipped", message: "X/Twitter credentials missing. Add TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET to .env.local" };
+  }
+
+  try {
+    console.log(`[SOCIAL] Composing tweet for: ${article.title}`);
+
+    // Compose the tweet (280 char limit)
+    const link = postUrl || '';
+    const hashtags = '#ContentEngine #NichePulse #AI2026';
+    const titleTruncated = article.title.length > 120 ? article.title.substring(0, 117) + '...' : article.title;
+    const metaSnippet = article.metaDescription.length > 80 ? article.metaDescription.substring(0, 77) + '...' : article.metaDescription;
+    
+    let tweetText = `🚀 ${titleTruncated}\n\n${metaSnippet}`;
+    if (link) tweetText += `\n\n🔗 ${link}`;
+    tweetText += `\n\n${hashtags}`;
+
+    // Ensure under 280 chars
+    if (tweetText.length > 280) {
+      tweetText = tweetText.substring(0, 277) + '...';
+    }
+
+    // Twitter API v2 endpoint
+    const tweetUrl = 'https://api.twitter.com/2/tweets';
+
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: apiKey,
+      oauth_nonce: generateOAuthNonce(),
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_token: accessToken,
+      oauth_version: '1.0',
+    };
+
+    const authHeader = await generateOAuthHeader('POST', tweetUrl, oauthParams, apiSecret, accessSecret);
+
+    console.log(`[SOCIAL] Posting tweet to X...`);
+    const res = await fetch(tweetUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: tweetText }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || data.title || JSON.stringify(data.errors) || 'Failed to post tweet');
+    }
+
+    const tweetId = data.data?.id;
+    console.log(`[SOCIAL] ✅ Tweet posted: ${tweetId}`);
+
+    return {
+      status: "success",
+      url: `https://x.com/i/status/${tweetId}`,
+      platform: "X/Twitter"
+    };
+  } catch (error: any) {
+    console.error(`[SOCIAL ERROR] X/Twitter failed: ${error.message}`);
+    return { status: "error", message: error.message };
+  }
+}
+
 export async function publishToTikTok(article: DraftArticle) {
   console.log(`[SOCIAL] Syncing with TikTok Creative Center...`);
   // Realistic implementation would use TikTok Content Posting API

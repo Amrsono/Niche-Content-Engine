@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTikTok, calculatePeakTime } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, calculatePeakTime } from '@/lib/agents';
 
 export async function POST(request: Request) {
   try {
@@ -33,8 +33,9 @@ export async function POST(request: Request) {
       publishResult = await publishToLocal(draft, targetKeyword);
     }
     
-    // 5. Social Media Phase (Pulse across Instagram/TikTok)
+    // 5. Social Media Phase (Pulse across Instagram/X/TikTok)
     const igResult = await publishToInstagram(draft);
+    const xResult = await publishToTwitter(draft, publishResult.url);
     const ttResult = await publishToTikTok(draft);
 
     // 6. Scheduling (Peak Engagement)
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
       postUrl: publishResult.url,
       socialUrls: {
         instagram: igResult.url,
+        twitter: xResult.url,
         tiktok: ttResult.url
       },
       platform: publishResult.platform || (cmsProvider === 'sanity' ? 'Sanity' : 'WordPress'),
