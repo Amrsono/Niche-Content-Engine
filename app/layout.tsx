@@ -31,11 +31,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
         <head>
-          <Script
+          <script
             async
             src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7376665839682546"
             crossOrigin="anonymous"
-            strategy="afterInteractive"
           />
         </head>
         <body>{children}</body>
