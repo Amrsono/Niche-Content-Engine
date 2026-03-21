@@ -1,0 +1,41 @@
+.container {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.content {
+  padding: 40px;
+  margin-top: 20px;
+  line-height: 1.6;
+  font-size: 1.1rem;
+  color: #e0e6ed;
+}
+
+.content h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.content p {
+  margin-bottom: 20px;
+}
+
+.email {
+  color: var(--accent-1);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.backLink {
+  display: inline-block;
+  margin-top: 40px;
+  color: var(--accent-1);
+  font-size: 0.9rem;
+  transition: opacity 0.2s;
+}
+
+.backLink:hover {
+  opacity: 0.7;
+}
