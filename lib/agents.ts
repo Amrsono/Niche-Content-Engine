@@ -7,16 +7,21 @@ import { savePost } from "./storage";
  * Niche Content Engine - Core Logic powered by Groq
  */
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// We now initialize these lazily to ensure environment variables are picked up correctly
+function getAI() {
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+  return { groq, genAI };
+}
 
 // Models
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
-const FALLBACK_MODEL = "gemini-1.5-flash";
+const FALLBACK_MODEL = "gemini-2.5-flash";
 
 // Global Fallback Helper
 async function callGroq(options: any) {
+  const { groq, genAI } = getAI();
   try {
     return await groq.chat.completions.create(options);
   } catch (e: any) {
@@ -25,7 +30,9 @@ async function callGroq(options: any) {
       const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
       
       const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-      const result = await model.generateContent(prompt);
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
       const text = result.response.text();
       
       // Mock the Groq response structure for compatibility
