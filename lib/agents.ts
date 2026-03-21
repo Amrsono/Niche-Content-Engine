@@ -1,18 +1,17 @@
 import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
 import { savePost, updatePost } from "./storage";
 export { updatePost };
 
-/* 
- * Niche Content Engine - Core Logic powered by Groq
- */
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// We now initialize these lazily to ensure environment variables are picked up correctly
 function getAI() {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-  return { groq, genAI };
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+  return { groq, genAI, openai };
 }
 
 // Models
@@ -22,26 +21,35 @@ const FALLBACK_MODEL = "gemini-flash-latest";
 
 // Global Fallback Helper
 async function callGroq(options: any) {
-  const { groq, genAI } = getAI();
+  const { groq, genAI, openai } = getAI();
   try {
     return await groq.chat.completions.create(options);
   } catch (e: any) {
     if (e.status === 429) {
       console.warn(`[AI FALLBACK] Groq Rate Limit hit (${options.model}). Switching to Gemini...`);
-      const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-      
-      const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      });
-      const text = result.response.text();
-      
-      // Mock the Groq response structure for compatibility
-      return {
-        choices: [{
-          message: { content: text }
-        }]
-      };
+      try {
+        const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
+        const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+        const result = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+        const text = result.response.text();
+        return { choices: [{ message: { content: text } }] };
+      } catch (gemError: any) {
+        if (process.env.OPENAI_API_KEY) {
+          console.warn(`[AI FALLBACK] Gemini also failed. Switching to OpenAI...`);
+          try {
+            return await openai.chat.completions.create({
+              ...options,
+              model: "gpt-4o-mini" // Fast & cost-effective fallback
+            });
+          } catch (oaError: any) {
+            console.error("[CRITICAL AI FAILURE]", oaError);
+            throw oaError;
+          }
+        }
+        throw gemError;
+      }
     }
     throw e;
   }
@@ -198,6 +206,9 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
       const sectionHtml = await generateSection(section.title, keyword, productContext, contextSummary, section.targetWordCount);
       fullContent += sectionHtml + "\n\n";
       contextSummary += ` Completed: ${section.title}.`;
+      
+      // Delay to respect free-tier rate limits (minimal for Groq, more for safety if fallback happens)
+      await delay(1200); 
     }
 
     // Generate Meta Description with Fallback

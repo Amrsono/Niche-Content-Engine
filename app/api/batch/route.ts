@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToInstagram, publishToTwitter, updatePost, PublishResult } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 
 export async function POST(request: Request) {
@@ -14,20 +14,22 @@ export async function POST(request: Request) {
     
     const results = [];
     
-    // 2. Parallel Generation (Groq is fast enough to handle this)
-    const batchTasks = targetTrends.map(async (trend, index) => {
+    const completedActions = [];
+    
+    // 2. Sequential Generation (Prevents hitting rate limits in bulk mode)
+    for (const [index, trend] of targetTrends.entries()) {
       try {
-        console.log(`[BATCH] Processing #${index + 1}: ${trend.keyword}`);
+        console.log(`[BATCH] Processing #${index + 1}/${targetTrends.length}: ${trend.keyword}`);
         
         // Generate Article
         const article = await generateArticle(trend.keyword);
         
-        // Generate Image
+        // Generate Image (Static placeholder for now as per agents.ts)
         const ogImageUrl = await generateOgImage(article.title);
         article.ogImageUrl = ogImageUrl;
         
-        // Publish (Mock for now)
-        const publishResult: PublishResult = await publishToWordpress(article);
+        // Publish (Local Pulse Blog)
+        const publishResult: PublishResult = await publishToLocal(article, trend.keyword);
         
         // Social Signal - Instagram & X/Twitter
         const igResult = await publishToInstagram(article);
@@ -44,20 +46,23 @@ export async function POST(request: Request) {
           });
         }
         
-        return {
+        completedActions.push({
           keyword: trend.keyword,
           title: article.title,
           url: publishResult.url,
           instagram: igResult.status === 'success' ? igResult.url : igResult.status,
           twitter: xResult.status === 'success' ? xResult.url : xResult.status,
           indexing: indexingResult.success
-        };
-      } catch (err: any) {
-        return { keyword: trend.keyword, error: err.message };
-      }
-    });
+        });
 
-    const completedActions = await Promise.all(batchTasks);
+        // Small cooldown between articles to breathe
+        if (index < targetTrends.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      } catch (err: any) {
+        completedActions.push({ keyword: trend.keyword, error: err.message });
+      }
+    }
 
     return NextResponse.json({
       success: true,
