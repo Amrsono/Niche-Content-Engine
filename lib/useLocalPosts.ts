@@ -1,18 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-export interface Post {
-  id: string;
-  title: string;
-  content: string;
-  metaDescription: string;
-  ogImageUrl?: string;
-  publishedAt: string;
-  slug: string;
-  keyword: string;
-  status: string;
-}
+import type { Post } from './types';
 
 const STORAGE_KEY = "pulse-blog-posts";
 

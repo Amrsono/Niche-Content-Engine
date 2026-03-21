@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePosts, type Post } from '@/lib/useLocalPosts';
+import { usePosts } from '@/lib/useLocalPosts';
+import type { Post } from '@/lib/types';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
 import { Instagram, X, Video } from 'lucide-react';

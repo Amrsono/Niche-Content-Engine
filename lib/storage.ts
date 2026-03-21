@@ -1,25 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import type { Post } from './types';
 
 // On Vercel, only /tmp is writable. In dev, use the local data/ dir.
 const IS_SERVERLESS = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 const DATA_DIR = IS_SERVERLESS ? '/tmp' : path.join(process.cwd(), 'data');
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
-
-export interface Post {
-  id: string;
-  title: string;
-  content: string;
-  metaDescription: string;
-  ogImageUrl?: string;
-  status: 'published' | 'scheduled' | 'draft';
-  publishedAt: string;
-  slug: string;
-  keyword: string;
-  instagramUrl?: string;
-  twitterUrl?: string;
-  tiktokUrl?: string;
-}
 
 export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) {
   const posts = await getPosts();
