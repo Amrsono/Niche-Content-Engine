@@ -343,8 +343,8 @@ export async function publishToSanity(article: DraftArticle): Promise<PublishRes
 }
 
 export async function publishToInstagram(article: DraftArticle): Promise<PublishResult> {
-  const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID?.trim();
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim();
 
   if (!businessId || !token) {
     console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
@@ -357,19 +357,23 @@ export async function publishToInstagram(article: DraftArticle): Promise<Publish
     // Step 1: Create Media Container
     // Caption includes the title and some hashtags
     const caption = `${article.title}\n\n${article.metaDescription}\n\n#niche #pulse2026 #contentengine`;
-    const containerRes = await fetch(`https://graph.facebook.com/v19.0/${businessId}/media`, {
+    
+    // Move access_token to Query String for maximum reliability
+    const containerRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         image_url: article.ogImageUrl,
         caption: caption,
-        access_token: token,
       }),
     });
 
     const containerData = await containerRes.json();
     if (!containerData.id) {
-      throw new Error(containerData.error?.message || "Failed to create media container");
+      const fbError = containerData.error?.message || "Failed to create media container";
+      const fbCode = containerData.error?.code ? `(Code ${containerData.error.code})` : "";
+      console.error('[INSTAGRAM ERROR]', JSON.stringify(containerData, null, 2));
+      throw new Error(`${fbError} ${fbCode}`);
     }
 
     const creationId = containerData.id;
@@ -380,23 +384,25 @@ export async function publishToInstagram(article: DraftArticle): Promise<Publish
 
     // Step 3: Publish Media
     console.log(`[SOCIAL] Publishing to Instagram...`);
-    const publishRes = await fetch(`https://graph.facebook.com/v19.0/${businessId}/media_publish`, {
+    const publishRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media_publish?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         creation_id: creationId,
-        access_token: token,
       }),
     });
 
     const publishData = await publishRes.json();
     if (!publishData.id) {
-      throw new Error(publishData.error?.message || "Failed to publish media");
+       const fbError = publishData.error?.message || "Failed to publish media";
+       const fbCode = publishData.error?.code ? `(Code ${publishData.error.code})` : "";
+       console.error('[INSTAGRAM ERROR PUBLISH]', JSON.stringify(publishData, null, 2));
+       throw new Error(`${fbError} ${fbCode}`);
     }
 
     return { 
       status: "success", 
-      url: `https://instagram.com/p/${publishData.id}`, 
+      url: `https://instagram.com/reels/${publishData.id}`, 
       platform: "Instagram" 
     };
   } catch (error: any) {
@@ -408,12 +414,7 @@ export async function publishToInstagram(article: DraftArticle): Promise<Publish
 // ---- X / Twitter Integration (API v2 + OAuth 1.0a) ----
 
 function generateOAuthNonce() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return Math.random().toString(36).substring(2, 11);
 }
 
 function percentEncode(str: string) {
@@ -450,11 +451,11 @@ async function generateOAuthHeader(
   return `OAuth ${headerParts}`;
 }
 
-export async function publishToTwitter(article: DraftArticle, postUrl?: string): Promise<PublishResult> {
-  const apiKey = process.env.TWITTER_API_KEY;
-  const apiSecret = process.env.TWITTER_API_SECRET;
-  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
-  const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET;
+export async function publishToTwitter(article: DraftArticle, blogUrl: string): Promise<PublishResult> {
+  const apiKey = process.env.TWITTER_API_KEY?.trim();
+  const apiSecret = process.env.TWITTER_API_SECRET?.trim();
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim();
+  const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET?.trim();
 
   if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
     console.warn(`[SOCIAL WARNING] X/Twitter credentials missing. Skipping post.`);
@@ -465,7 +466,7 @@ export async function publishToTwitter(article: DraftArticle, postUrl?: string):
     console.log(`[SOCIAL] Composing tweet for: ${article.title}`);
 
     // Compose the tweet (280 char limit)
-    const link = postUrl || '';
+    const link = blogUrl || '';
     const hashtags = '#ContentEngine #NichePulse #AI2026';
     const titleTruncated = article.title.length > 120 ? article.title.substring(0, 117) + '...' : article.title;
     const metaSnippet = article.metaDescription.length > 80 ? article.metaDescription.substring(0, 77) + '...' : article.metaDescription;
@@ -490,6 +491,8 @@ export async function publishToTwitter(article: DraftArticle, postUrl?: string):
       oauth_token: accessToken,
       oauth_version: '1.0',
     };
+
+    console.log('[X DEBUG] OAuth Params:', { ...oauthParams, oauth_consumer_key: 'HIDDEN' });
 
     const authHeader = await generateOAuthHeader('POST', tweetUrl, oauthParams, apiSecret, accessSecret);
 
