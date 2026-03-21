@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
 import { savePost } from "./storage";
 
@@ -7,10 +8,36 @@ import { savePost } from "./storage";
  */
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // Models
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
+const FALLBACK_MODEL = "gemini-1.5-flash";
+
+// Global Fallback Helper
+async function callGroq(options: any) {
+  try {
+    return await groq.chat.completions.create(options);
+  } catch (e: any) {
+    if (e.status === 429) {
+      console.warn(`[AI FALLBACK] Groq Rate Limit hit (${options.model}). Switching to Gemini...`);
+      const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
+      
+      const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      // Mock the Groq response structure for compatibility
+      return {
+        choices: [{
+          message: { content: text }
+        }]
+      };
+    }
+    throw e;
+  }
+}
 
 export interface TrendData {
   keyword: string;
@@ -40,10 +67,9 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
       tiktok: tiktokTrends 
     });
 
-    console.log(`[DISCOVERY] Analyzing ${googleTrends.length + tiktokTrends.length} raw signals with Groq...`);
+    console.log(`[DISCOVERY] Analyzing ${googleTrends.length + tiktokTrends.length} raw signals...`);
 
-    // B. Let Groq filter and rank based on real data
-    const chatCompletion = await groq.chat.completions.create({
+    const chatCompletion = await callGroq({
       messages: [
         {
           role: "system",
@@ -58,7 +84,9 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
       response_format: { type: "json_object" }
     });
 
-    const data = JSON.parse(chatCompletion.choices[0].message.content || "{}");
+    const content = chatCompletion.choices[0].message.content || "{}";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
     return (data.trends || []).map((t: any) => ({ ...t, niche }));
   } catch (err: any) {
     console.error("[DISCOVERY ERROR]", err);
@@ -89,7 +117,7 @@ async function findAffiliateProducts(keyword: string) {
 
 // Multi-Pass Step 1: Generate Outline
 async function generateOutline(keyword: string) {
-  const chatCompletion = await groq.chat.completions.create({
+  const chatCompletion = await callGroq({
     messages: [
       {
         role: "system",
@@ -103,12 +131,15 @@ async function generateOutline(keyword: string) {
     model: REASONING_MODEL,
     response_format: { type: "json_object" }
   });
-  return JSON.parse(chatCompletion.choices[0].message.content || "{}").sections || [];
+  
+  const content = chatCompletion.choices[0].message.content || "{}";
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : content).sections || [];
 }
 
 // Multi-Pass Step 2: Generate Individual Section
 async function generateSection(title: string, keyword: string, productContext: string, previousContext: string, targetWords: number) {
-  const chatCompletion = await groq.chat.completions.create({
+  const chatCompletion = await callGroq({
     messages: [
       {
         role: "system",
@@ -153,8 +184,8 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
       contextSummary += ` Completed: ${section.title}.`;
     }
 
-    // Generate Meta Description with Groq
-    const metaCompletion = await groq.chat.completions.create({
+    // Generate Meta Description with Fallback
+    const metaCompletion = await callGroq({
       messages: [{ role: "user", content: `Write a high-CTR SEO meta description for this article title: "${keyword}". Max 160 chars.` }],
       model: DISCOVERY_MODEL
     });
@@ -175,8 +206,8 @@ export async function generateOgImage(title: string): Promise<string> {
   console.log(`[SEO] Generating AI Image for: ${title}`);
   
   try {
-    // A. Generate a high-quality prompt with Groq
-    const promptCompletion = await groq.chat.completions.create({
+    // A. Generate a high-quality prompt with Fallback
+    const promptCompletion = await callGroq({
       messages: [
         {
           role: "user",
@@ -187,7 +218,9 @@ export async function generateOgImage(title: string): Promise<string> {
       response_format: { type: "json_object" }
     });
     
-    const imagePrompt = JSON.parse(promptCompletion.choices[0].message.content || "{}").prompt || title;
+    const content = promptCompletion.choices[0].message.content || "{}";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || title;
 
     // B. Check for API Keys (DALL-E 3 or Imagen)
     const openaiKey = process.env.OPENAI_API_KEY;
