@@ -5,7 +5,7 @@ import { requestIndexing } from '@/lib/indexing';
 export async function POST(request: Request) {
   try {
     const { niche, count = 5 } = await request.json();
-    
+    console.log(`[BATCH] CWD: ${process.cwd()}`);
     console.log(`[BATCH] Starting bulk cycle for niche: ${niche} (Count: ${count})`);
     
     // 1. Discovery Phase

@@ -3,6 +3,7 @@ import { getPosts } from '@/lib/storage';
 
 export async function GET() {
   try {
+    console.log(`[API/POSTS] GET request. reading from storage...`);
     const posts = await getPosts();
     return NextResponse.json({ success: true, posts });
   } catch (error: any) {
