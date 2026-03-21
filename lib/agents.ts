@@ -207,8 +207,8 @@ export async function generateOgImage(title: string): Promise<string> {
 
     // C. Fallback to high-quality Unsplash if no keys
     console.log(`[SEO] No AI keys found. Falling back to Unsplash.`);
-    const term = title.split(' ')[0].toLowerCase();
-    return `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1200&h=630&q=${term}`;
+    const term = encodeURIComponent(title.split(' ').slice(0, 2).join(' '));
+    return `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1200&h=630`;
   } catch (err) {
     console.warn(`[SEO ERROR] Image generation failed:`, err);
     return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
