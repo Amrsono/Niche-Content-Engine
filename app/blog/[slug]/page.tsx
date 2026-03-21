@@ -1,29 +1,26 @@
-import { getPostBySlug } from '@/lib/storage';
+"use client";
+
+import { usePosts } from '@/lib/useLocalPosts';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
-import { Metadata } from 'next';
+import { use } from 'react';
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  const post = await getPostBySlug(slug);
-  if (!post) return { title: 'Post Not Found' };
-  
-  return {
-    title: post.title,
-    description: post.metaDescription,
-    openGraph: {
-      title: post.title,
-      description: post.metaDescription,
-      images: [post.ogImageUrl || ''],
-    },
-  };
-}
+export default function PostReader({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
+  const { posts } = usePosts();
+  const post = posts.find(p => p.slug === slug);
 
-export default async function PostReader({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  // Show loading state while localStorage hydrates
+  if (posts.length === 0) {
+    return (
+      <main className={styles.blogContainer}>
+        <FloatingNav />
+        <div style={{ textAlign: 'center', paddingTop: '200px', color: '#64748b' }}>Loading...</div>
+      </main>
+    );
+  }
 
   if (!post) {
     notFound();

@@ -1,11 +1,13 @@
-import { getPosts } from '@/lib/storage';
+"use client";
+
+import { usePosts } from '@/lib/useLocalPosts';
 import Link from 'next/link';
 import Image from 'next/image';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
 
-export default async function BlogPage() {
-  const posts = await getPosts();
+export default function BlogPage() {
+  const { posts } = usePosts();
 
   return (
     <main className={styles.blogContainer}>

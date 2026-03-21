@@ -74,9 +74,25 @@ export function PulseTerminal() {
         await new Promise(r => setTimeout(r, 800));
         addLog(`[REASONING] Article generated: "${data.draftPreview.title}"`, 'info');
         await new Promise(r => setTimeout(r, 800));
+        
+        // Save article to localStorage so Pulse Blog can display it
+        const newPost = {
+          id: Math.random().toString(36).substring(2, 11),
+          title: data.draftPreview.title,
+          content: data.draftPreview.content,
+          metaDescription: data.draftPreview.metaDescription,
+          ogImageUrl: data.draftPreview.ogImageUrl,
+          publishedAt: new Date().toISOString(),
+          slug: data.draftPreview.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+          keyword: data.keyword,
+          status: 'published'
+        };
+        const existing = JSON.parse(localStorage.getItem('pulse-blog-posts') || '[]');
+        localStorage.setItem('pulse-blog-posts', JSON.stringify([newPost, ...existing]));
+        
         addLog(`[SEO] OG Image concept created.`, 'success');
         await new Promise(r => setTimeout(r, 600));
-        addLog(`[PUBLISHER] Draft ready for review.`, 'success');
+        addLog(`[PUBLISHER] Article live in Pulse Blog!`, 'success');
         addLog(`Success! Cycle complete.`, 'system');
       }
     } catch (err: any) {
