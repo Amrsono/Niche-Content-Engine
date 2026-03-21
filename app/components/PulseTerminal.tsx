@@ -11,7 +11,7 @@ interface LogEntry {
 export function PulseTerminal() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [niche, setNiche] = useState('Sustainable Tech');
+  const [niche, setNiche] = useState(''); // Ensure blank by default
   const [isBulk, setIsBulk] = useState(false);
   const [bulkCount, setBulkCount] = useState(5);
   const scrollRef = useRef<HTMLDivElement>(null);
