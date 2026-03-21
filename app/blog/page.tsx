@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePosts } from '@/lib/useLocalPosts';
+import { usePosts, type Post } from '@/lib/useLocalPosts';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
 import { Instagram, X, Video } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function BlogPage() {
           </div>
         ) : (
           <div className={styles.postGrid}>
-             {posts.map((post) => (
+             {posts.map((post: Post) => (
                 <article 
                   className={styles.postCard} 
                   key={post.id} 
