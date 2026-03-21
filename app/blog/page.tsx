@@ -30,10 +30,11 @@ export default function BlogPage() {
                 <article className={styles.postCard}>
                   <div className={styles.imageWrapper}>
                     <Image 
-                      src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000'} 
+                      src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop'} 
                       alt={post.title}
-                      fill
-                      className={styles.postImage}
+                      width={600}
+                      height={338}
+                      style={{ width: '100%', height: '210px', objectFit: 'cover', display: 'block' }}
                     />
                   </div>
                   <div className={styles.cardContent}>
