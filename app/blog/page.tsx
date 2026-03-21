@@ -2,9 +2,10 @@
 
 import { usePosts } from '@/lib/useLocalPosts';
 import Link from 'next/link';
-import Image from 'next/image';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop';
 
 export default function BlogPage() {
   const { posts } = usePosts();
@@ -29,12 +30,12 @@ export default function BlogPage() {
               <Link href={`/blog/${post.slug}`} key={post.id}>
                 <article className={styles.postCard}>
                   <div className={styles.imageWrapper}>
-                    <Image 
-                      src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop'} 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={post.ogImageUrl || FALLBACK_IMG} 
                       alt={post.title}
-                      width={600}
-                      height={338}
                       style={{ width: '100%', height: '210px', objectFit: 'cover', display: 'block' }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
                     />
                   </div>
                   <div className={styles.cardContent}>

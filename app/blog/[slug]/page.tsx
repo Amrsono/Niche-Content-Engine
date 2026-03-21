@@ -2,7 +2,6 @@
 
 import { usePosts } from '@/lib/useLocalPosts';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
 import { use } from 'react';
@@ -44,13 +43,12 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
         </header>
 
         <div className={styles.featuredImageArea}>
-          <Image 
-            src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000'} 
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'} 
             alt={post.title}
-            width={1200}
-            height={630}
-            priority
             style={{ width: '100%', height: 'auto', display: 'block' }}
+            onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'; }}
           />
         </div>
 
