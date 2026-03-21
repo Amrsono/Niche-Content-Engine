@@ -22,12 +22,18 @@ const FALLBACK_MODEL = "gemini-flash-latest";
 // Global Fallback Helper
 async function callGroq(options: any) {
   const { groq, genAI, openai } = getAI();
+  
+  // 1. Try Groq (Primary)
   try {
     return await groq.chat.completions.create(options);
   } catch (e: any) {
     if (e.status === 429) {
-      console.warn(`[AI FALLBACK] Groq Rate Limit hit (${options.model}). Switching to Gemini...`);
+      console.warn(`[AI FALLBACK] Groq Rate Limit hit (${options.model}). Cooling down (3s)...`);
+      await delay(3000); // 3 second breather
+      
+      // 2. Try Gemini (Secondary)
       try {
+        console.warn(`[AI FALLBACK] Switching to Gemini...`);
         const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
         const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
         const result = await model.generateContent({
@@ -36,16 +42,23 @@ async function callGroq(options: any) {
         const text = result.response.text();
         return { choices: [{ message: { content: text } }] };
       } catch (gemError: any) {
-        if (process.env.OPENAI_API_KEY) {
-          console.warn(`[AI FALLBACK] Gemini also failed. Switching to OpenAI...`);
+        // Handle Gemini 429 specifically
+        const isGemQuota = gemError.message?.includes('429') || gemError.status === 429;
+        
+        if (isGemQuota && process.env.OPENAI_API_KEY) {
+          console.warn(`[AI FALLBACK] Gemini Quota also hit. Cooling down (7s)...`);
+          await delay(7000); // Longer breather for OpenAI
+          
+          // 3. Try OpenAI (Tertiary)
           try {
+            console.warn(`[AI FALLBACK] Switching to OpenAI (GPT-4o-mini)...`);
             return await openai.chat.completions.create({
               ...options,
-              model: "gpt-4o-mini" // Fast & cost-effective fallback
+              model: "gpt-4o-mini"
             });
           } catch (oaError: any) {
-            console.error("[CRITICAL AI FAILURE]", oaError);
-            throw oaError;
+            console.error("[CRITICAL AI FAILURE] Total provider exhaustion.", oaError);
+            throw new Error(`CRITICAL: All AI providers at quota. Please wait 60 seconds and try again.`);
           }
         }
         throw gemError;
