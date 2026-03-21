@@ -16,6 +16,9 @@ export interface Post {
   publishedAt: string;
   slug: string;
   keyword: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  tiktokUrl?: string;
 }
 
 export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) {
@@ -50,3 +53,19 @@ export async function getPostBySlug(slug: string): Promise<Post | undefined> {
   const posts = await getPosts();
   return posts.find(p => p.slug === slug);
 }
+
+export async function updatePost(id: string, updates: Partial<Post>) {
+  const posts = await getPosts();
+  const index = posts.findIndex(p => p.id === id);
+  if (index === -1) return null;
+  
+  posts[index] = { ...posts[index], ...updates };
+  
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2));
+  return posts[index];
+}
+

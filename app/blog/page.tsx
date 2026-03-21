@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { usePosts } from '@/lib/useLocalPosts';
-import Link from 'next/link';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
+import { Instagram, X, Video } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop';
 
 export default function BlogPage() {
   const { posts, refresh } = usePosts();
+  const router = useRouter();
 
   useEffect(() => {
     const handleUpdate = () => refresh();
@@ -33,9 +35,13 @@ export default function BlogPage() {
           </div>
         ) : (
           <div className={styles.postGrid}>
-            {posts.map((post) => (
-              <Link href={`/blog/${post.slug}`} key={post.id}>
-                <article className={styles.postCard}>
+             {posts.map((post) => (
+                <article 
+                  className={styles.postCard} 
+                  key={post.id} 
+                  onClick={() => router.push(`/blog/${post.slug}`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className={styles.imageWrapper}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
@@ -53,11 +59,27 @@ export default function BlogPage() {
                       <span className={styles.date}>
                         {new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
+                      <div className={styles.socialLinks} onClick={(e) => e.stopPropagation()}>
+                        {post.instagramUrl && (
+                          <a href={post.instagramUrl} target="_blank" rel="noopener noreferrer" title="View on Instagram">
+                            <Instagram size={18} />
+                          </a>
+                        )}
+                        {post.twitterUrl && (
+                          <a href={post.twitterUrl} target="_blank" rel="noopener noreferrer" title="View on X">
+                            <X size={18} />
+                          </a>
+                        )}
+                        {post.tiktokUrl && (
+                          <a href={post.tiktokUrl} target="_blank" rel="noopener noreferrer" title="View on TikTok">
+                            <Video size={18} />
+                          </a>
+                        )}
+                      </div>
                       <span className={styles.readMore}>Read Pulse →</span>
                     </div>
                   </div>
                 </article>
-              </Link>
             ))}
           </div>
         )}

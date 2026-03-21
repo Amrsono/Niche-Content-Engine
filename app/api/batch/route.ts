@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToInstagram, publishToTwitter } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToInstagram, publishToTwitter, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 
 export async function POST(request: Request) {
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         article.ogImageUrl = ogImageUrl;
         
         // Publish (Mock for now)
-        const publishResult = await publishToWordpress(article);
+        const publishResult: PublishResult = await publishToWordpress(article);
         
         // Social Signal - Instagram & X/Twitter
         const igResult = await publishToInstagram(article);
@@ -35,6 +35,14 @@ export async function POST(request: Request) {
         
         // Indexing (Fast-Track)
         const indexingResult = await requestIndexing(publishResult.url || `https://yoursite.com/${trend.keyword}`);
+        
+        // Save Social Links to Local Pulse if applicable
+        if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
+          await updatePost(publishResult.id, {
+            instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
+            twitterUrl: xResult.status === 'success' ? xResult.url : undefined,
+          });
+        }
         
         return {
           keyword: trend.keyword,

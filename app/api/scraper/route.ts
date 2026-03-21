@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, calculatePeakTime } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, calculatePeakTime, updatePost, PublishResult } from '@/lib/agents';
 
 export async function POST(request: Request) {
   try {
     const { niche } = await request.json();
     
     // 1. Discovery Phase (Trends & TikTok)
-    const trends = await runTrendScraper(niche || 'Sustainable Tech');
+    const trends = await runTrendScraper(niche || 'All Trends');
     if (trends.length === 0) {
       return NextResponse.json({ message: "No high-growth, low-comp keywords found." });
     }
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     
     // 4. Auto-Publisher Phase (Local by default, or WordPress/Sanity)
     const cmsProvider = request.headers.get('x-cms-provider');
-    let publishResult;
+    let publishResult: PublishResult;
     
     if (cmsProvider === 'wordpress') {
       publishResult = await publishToWordpress(draft);
@@ -38,7 +38,16 @@ export async function POST(request: Request) {
     const xResult = await publishToTwitter(draft, publishResult.url);
     const ttResult = await publishToTikTok(draft);
 
-    // 6. Scheduling (Peak Engagement)
+    // 6. Persistence Update (Link social posts to local storage if using local)
+    if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
+      await updatePost(publishResult.id, {
+        instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
+        twitterUrl: xResult.status === 'success' ? xResult.url : undefined,
+        tiktokUrl: ttResult.status === 'success' ? ttResult.url : undefined
+      });
+    }
+
+    // 7. Scheduling (Peak Engagement)
     const scheduledAt = calculatePeakTime();
     
     return NextResponse.json({

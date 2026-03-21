@@ -1,7 +1,8 @@
 import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
-import { savePost } from "./storage";
+import { savePost, updatePost } from "./storage";
+export { updatePost };
 
 /* 
  * Niche Content Engine - Core Logic powered by Groq
@@ -17,7 +18,7 @@ function getAI() {
 // Models
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
-const FALLBACK_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-flash-latest";
 
 // Global Fallback Helper
 async function callGroq(options: any) {
@@ -58,6 +59,14 @@ export interface DraftArticle {
   content: string;
   metaDescription: string;
   ogImageUrl?: string;
+}
+
+export interface PublishResult {
+  status: "success" | "error" | "skipped";
+  url?: string;
+  platform: string;
+  id?: string;
+  message?: string;
 }
 
 // 1. Discovery Agent (Now with Real-time Scraping)
@@ -257,7 +266,7 @@ export async function generateOgImage(title: string): Promise<string> {
 
 
 // 4. Auto-Publisher (WordPress / Sanity / Local)
-export async function publishToLocal(article: DraftArticle, keyword: string) {
+export async function publishToLocal(article: DraftArticle, keyword: string): Promise<PublishResult> {
   console.log(`[PUBLISHER] Saving to local blog storage...`);
   const post = await savePost({
     title: article.title,
@@ -270,11 +279,12 @@ export async function publishToLocal(article: DraftArticle, keyword: string) {
   
   return { 
     status: "success", 
+    id: post.id,
     url: `/blog/${post.slug}`, 
     platform: "Local-Pulse-Blog"
   };
 }
-export async function publishToWordpress(article: DraftArticle) {
+export async function publishToWordpress(article: DraftArticle): Promise<PublishResult> {
   console.log(`[PUBLISHER] Preparing for WordPress publication...`);
   
   const wpBaseUrl = process.env.WP_BASE_URL;
@@ -296,7 +306,7 @@ export async function publishToWordpress(article: DraftArticle) {
   };
 }
 
-export async function publishToSanity(article: DraftArticle) {
+export async function publishToSanity(article: DraftArticle): Promise<PublishResult> {
   console.log(`[PUBLISHER] Pushing to Sanity CMS...`);
   const sanityProjectId = process.env.SANITY_PROJECT_ID;
 
@@ -304,16 +314,16 @@ export async function publishToSanity(article: DraftArticle) {
     return { status: "success", url: `https://${sanityProjectId}.sanity.studio`, platform: "Sanity" };
   }
 
-  return { status: "error", message: "Sanity Project ID missing" };
+  return { status: "error", message: "Sanity Project ID missing", platform: "Sanity" };
 }
 
-export async function publishToInstagram(article: DraftArticle) {
+export async function publishToInstagram(article: DraftArticle): Promise<PublishResult> {
   const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
   const token = process.env.INSTAGRAM_ACCESS_TOKEN;
 
   if (!businessId || !token) {
     console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
-    return { status: "skipped", message: "Instagram credentials missing" };
+    return { status: "skipped", message: "Instagram credentials missing", platform: "Instagram" };
   }
 
   try {
@@ -366,7 +376,7 @@ export async function publishToInstagram(article: DraftArticle) {
     };
   } catch (error: any) {
     console.error(`[SOCIAL ERROR] Instagram failed: ${error.message}`);
-    return { status: "error", message: error.message };
+    return { status: "error", message: error.message, platform: "Instagram" };
   }
 }
 
@@ -415,7 +425,7 @@ async function generateOAuthHeader(
   return `OAuth ${headerParts}`;
 }
 
-export async function publishToTwitter(article: DraftArticle, postUrl?: string) {
+export async function publishToTwitter(article: DraftArticle, postUrl?: string): Promise<PublishResult> {
   const apiKey = process.env.TWITTER_API_KEY;
   const apiSecret = process.env.TWITTER_API_SECRET;
   const accessToken = process.env.TWITTER_ACCESS_TOKEN;
@@ -423,7 +433,7 @@ export async function publishToTwitter(article: DraftArticle, postUrl?: string) 
 
   if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
     console.warn(`[SOCIAL WARNING] X/Twitter credentials missing. Skipping post.`);
-    return { status: "skipped", message: "X/Twitter credentials missing. Add TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET to .env.local" };
+    return { status: "skipped", message: "X/Twitter credentials missing. Add TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET to .env.local", platform: "X/Twitter" };
   }
 
   try {
@@ -484,11 +494,11 @@ export async function publishToTwitter(article: DraftArticle, postUrl?: string) 
     };
   } catch (error: any) {
     console.error(`[SOCIAL ERROR] X/Twitter failed: ${error.message}`);
-    return { status: "error", message: error.message };
+    return { status: "error", message: error.message, platform: "X/Twitter" };
   }
 }
 
-export async function publishToTikTok(article: DraftArticle) {
+export async function publishToTikTok(article: DraftArticle): Promise<PublishResult> {
   console.log(`[SOCIAL] Syncing with TikTok Creative Center...`);
   // Realistic implementation would use TikTok Content Posting API
   await new Promise(resolve => setTimeout(resolve, 1500));
