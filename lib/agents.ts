@@ -268,14 +268,66 @@ export async function publishToSanity(article: DraftArticle) {
 }
 
 export async function publishToInstagram(article: DraftArticle) {
-  console.log(`[SOCIAL] Preparing Instagram Pulse...`);
-  // Realistic implementation would use Meta Graph API
-  await new Promise(resolve => setTimeout(resolve, 1200));
-  return { 
-    status: "success", 
-    url: "https://instagram.com/p/niche-pulse-2026", 
-    platform: "Instagram" 
-  };
+  const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+
+  if (!businessId || !token) {
+    console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
+    return { status: "skipped", message: "Instagram credentials missing" };
+  }
+
+  try {
+    console.log(`[SOCIAL] Creating Instagram media container...`);
+    
+    // Step 1: Create Media Container
+    // Caption includes the title and some hashtags
+    const caption = `${article.title}\n\n${article.metaDescription}\n\n#niche #pulse2026 #contentengine`;
+    const containerRes = await fetch(`https://graph.facebook.com/v19.0/${businessId}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_url: article.ogImageUrl,
+        caption: caption,
+        access_token: token,
+      }),
+    });
+
+    const containerData = await containerRes.json();
+    if (!containerData.id) {
+      throw new Error(containerData.error?.message || "Failed to create media container");
+    }
+
+    const creationId = containerData.id;
+    console.log(`[SOCIAL] Container created: ${creationId}. Waiting for processing...`);
+
+    // Step 2: Meta needs a moment to process the image
+    await new Promise(resolve => setTimeout(resolve, 8000));
+
+    // Step 3: Publish Media
+    console.log(`[SOCIAL] Publishing to Instagram...`);
+    const publishRes = await fetch(`https://graph.facebook.com/v19.0/${businessId}/media_publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        creation_id: creationId,
+        access_token: token,
+      }),
+    });
+
+    const publishData = await publishRes.json();
+    if (!publishData.id) {
+      throw new Error(publishData.error?.message || "Failed to publish media");
+    }
+
+    return { 
+      status: "success", 
+      url: `https://instagram.com/p/${publishData.id}`, 
+      platform: "Instagram" 
+    };
+  } catch (error: any) {
+    console.error(`[SOCIAL ERROR] Instagram failed: ${error.message}`);
+    return { status: "error", message: error.message };
+  }
 }
 
 export async function publishToTikTok(article: DraftArticle) {

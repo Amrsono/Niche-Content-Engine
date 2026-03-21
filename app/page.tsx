@@ -2,7 +2,7 @@ import { FloatingNav } from "./components/FloatingNav";
 import { BentoBox } from "./components/BentoBox";
 import { PulseTerminal } from "./components/PulseTerminal";
 import { EarningsAnalytics } from "./components/EarningsAnalytics";
-import { HeatmapMockup } from "./components/HeatmapMockup";
+import { TrendHeatmap } from "./components/TrendHeatmap";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -21,7 +21,7 @@ export default function Home() {
         </BentoBox>
 
         <BentoBox delay={0.2} className={styles.heatmap}>
-          <HeatmapMockup />
+          <TrendHeatmap />
         </BentoBox>
 
         <BentoBox delay={0.3} className={styles.terminal}>

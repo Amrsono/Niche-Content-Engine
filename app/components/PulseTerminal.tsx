@@ -78,8 +78,13 @@ export function PulseTerminal() {
         addLog(`[SEO] OG Image concept created.`, 'success');
         await new Promise(r => setTimeout(r, 600));
 
-        addLog(`[SOCIAL] Posted to Instagram: [Success]`, 'success');
-        await new Promise(r => setTimeout(r, 400));
+        // Social Status Logic
+        if (data.socialUrls?.instagram) {
+          addLog(`[SOCIAL] Instagram Pulse: [Active]`, 'success');
+        } else {
+          addLog(`[SOCIAL] Instagram: [Skipped/Missing Credentials]`, 'info');
+        }
+        
         addLog(`[SOCIAL] Posted to TikTok: [Success]`, 'success');
         await new Promise(r => setTimeout(r, 400));
         
