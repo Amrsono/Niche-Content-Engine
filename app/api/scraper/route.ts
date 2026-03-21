@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, calculatePeakTime } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTikTok, calculatePeakTime } from '@/lib/agents';
 
 export async function POST(request: Request) {
   try {
@@ -33,7 +33,11 @@ export async function POST(request: Request) {
       publishResult = await publishToLocal(draft, targetKeyword);
     }
     
-    // 5. Scheduling (Peak Engagement)
+    // 5. Social Media Phase (Pulse across Instagram/TikTok)
+    const igResult = await publishToInstagram(draft);
+    const ttResult = await publishToTikTok(draft);
+
+    // 6. Scheduling (Peak Engagement)
     const scheduledAt = calculatePeakTime();
     
     return NextResponse.json({
@@ -41,6 +45,10 @@ export async function POST(request: Request) {
       message: "Autonomous cycle complete",
       keyword: targetKeyword,
       postUrl: publishResult.url,
+      socialUrls: {
+        instagram: igResult.url,
+        tiktok: ttResult.url
+      },
       platform: publishResult.platform || (cmsProvider === 'sanity' ? 'Sanity' : 'WordPress'),
       scheduledAt,
       draftPreview: draft

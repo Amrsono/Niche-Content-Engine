@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePosts } from '@/lib/useLocalPosts';
 import Link from 'next/link';
 import styles from './blog.module.css';
@@ -8,7 +9,13 @@ import { FloatingNav } from '../components/FloatingNav';
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop';
 
 export default function BlogPage() {
-  const { posts } = usePosts();
+  const { posts, refresh } = usePosts();
+
+  useEffect(() => {
+    const handleUpdate = () => refresh();
+    window.addEventListener('posts-updated', handleUpdate);
+    return () => window.removeEventListener('posts-updated', handleUpdate);
+  }, [refresh]);
 
   return (
     <main className={styles.blogContainer}>

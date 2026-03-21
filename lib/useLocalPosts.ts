@@ -18,27 +18,28 @@ const STORAGE_KEY = "pulse-blog-posts";
 
 export function usePosts() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchPosts = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch('/api/posts');
+      const data = await res.json();
+      if (data.success) {
+        setPosts(data.posts);
+      }
+    } catch (err) {
+      console.error("Failed to fetch posts:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) setPosts(JSON.parse(raw));
+    fetchPosts();
   }, []);
-
-  const addPost = (post: Omit<Post, "id" | "publishedAt" | "slug">) => {
-    const newPost: Post = {
-      ...post,
-      id: Math.random().toString(36).substring(2, 11),
-      publishedAt: new Date().toISOString(),
-      slug: post.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
-    };
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    const updated = [newPost, ...existing];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    setPosts(updated);
-    return newPost;
-  };
 
   const getPostBySlug = (slug: string) => posts.find((p) => p.slug === slug);
 
-  return { posts, addPost, getPostBySlug };
+  return { posts, isLoading, getPostBySlug, refresh: fetchPosts };
 }
