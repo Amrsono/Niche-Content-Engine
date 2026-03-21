@@ -221,7 +221,8 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
       contextSummary += ` Completed: ${section.title}.`;
       
       // Delay to respect free-tier rate limits (minimal for Groq, more for safety if fallback happens)
-      await delay(1200); 
+      // Increasing to 5s as per user preference (willing to wait for quality)
+      await delay(5000); 
     }
 
     // Generate Meta Description with Fallback
