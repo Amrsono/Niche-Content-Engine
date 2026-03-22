@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
 import AdSenseInArticle from '@/app/components/AdSenseInArticle';
+import AdSenseDisplay from '@/app/components/AdSenseDisplay';
 import { use } from 'react';
 
 /**
@@ -85,6 +86,9 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
           className={styles.articleBody}
           dangerouslySetInnerHTML={{ __html: contentAfter }}
         />
+
+        {/* Display ad at the bottom of each article */}
+        <AdSenseDisplay style={{ marginTop: '3rem' }} />
       </article>
     </main>
   );

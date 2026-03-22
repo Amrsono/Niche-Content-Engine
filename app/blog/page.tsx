@@ -5,6 +5,7 @@ import { usePosts } from '@/lib/useLocalPosts';
 import type { Post } from '@/lib/types';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
+import AdSenseDisplay from '../components/AdSenseDisplay';
 import { Instagram, X, Video, Share2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -54,6 +55,9 @@ export default function BlogPage() {
             <a href="/api/auth/tiktok/connect" className={styles.authLink}>🔗 Connect TikTok</a>
           </div>
         </header>
+
+        {/* Display ad below blog header */}
+        <AdSenseDisplay />
 
         {posts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
@@ -141,6 +145,9 @@ export default function BlogPage() {
             ))}
           </div>
         )}
+
+        {/* Display ad below posts grid */}
+        {posts.length > 0 && <AdSenseDisplay />}
       </div>
     </main>
   );
