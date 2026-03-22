@@ -344,7 +344,8 @@ export async function publishToSanity(article: DraftArticle): Promise<PublishRes
 
 export async function publishToInstagram(article: DraftArticle): Promise<PublishResult> {
   const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID?.trim();
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim();
+  // Aggressive sanitization: remove any invisible characters or quotes
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
 
   if (!businessId || !token) {
     console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
