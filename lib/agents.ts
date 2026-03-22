@@ -68,57 +68,83 @@ function getAI() {
 }
 
 // Models
+// Models
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
+const FAST_MODEL = "llama-3.1-8b-instant"; // For small tasks
 const FALLBACK_MODEL = "gemini-flash-latest";
 
 // Global Fallback Helper
-async function callGroq(options: any) {
+// Global Fallback Helper with Exponential Backoff
+async function callGroq(options: any): Promise<any> {
   const { groq, genAI, openai } = getAI();
   
-  // 1. Try Groq (Primary)
-  try {
-    return await groq.chat.completions.create(options);
-  } catch (e: any) {
-    if (e.status === 429) {
-      console.warn(`[AI FALLBACK] Groq Rate Limit hit (${options.model}). Cooling down (3s)...`);
-      await delay(3000); // 3 second breather
-      
-      // 2. Try Gemini (Secondary)
-      try {
-        console.warn(`[AI FALLBACK] Switching to Gemini...`);
-        const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-        const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-        const result = await model.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        });
-        const text = result.response.text();
-        return { choices: [{ message: { content: text } }] };
-      } catch (gemError: any) {
-        // Handle Gemini 429 specifically
-        const isGemQuota = gemError.message?.includes('429') || gemError.status === 429;
-        
-        if (isGemQuota && process.env.OPENAI_API_KEY) {
-          console.warn(`[AI FALLBACK] Gemini Quota also hit. Cooling down (7s)...`);
-          await delay(7000); // Longer breather for OpenAI
-          
-          // 3. Try OpenAI (Tertiary)
-          try {
-            console.warn(`[AI FALLBACK] Switching to OpenAI (GPT-4o-mini)...`);
-            return await openai.chat.completions.create({
-              ...options,
-              model: "gpt-4o-mini"
-            });
-          } catch (oaError: any) {
-            console.error("[CRITICAL AI FAILURE] Total provider exhaustion.", oaError);
-            throw new Error(`CRITICAL: All AI providers at quota. Please wait 60 seconds and try again.`);
-          }
-        }
-        throw gemError;
-      }
-    }
-    throw e;
+  // Model selection: Use faster model for small tasks if possible
+  const isSimpleTask = options.messages.some((m: any) => 
+    m.content?.toLowerCase().includes("hashtag") || 
+    m.content?.toLowerCase().includes("meta description")
+  );
+
+  if (isSimpleTask && options.model === DISCOVERY_MODEL) {
+    options.model = FAST_MODEL;
+    console.log(`[AI] Using FAST_MODEL (${FAST_MODEL}) for simple task.`);
   }
+
+  const MAX_TRIES = 2;
+  let attempt = 0;
+
+  while (attempt < MAX_TRIES) {
+    try {
+      // 1. Try Groq (Primary)
+      return await groq.chat.completions.create(options);
+    } catch (e: any) {
+      if (e.status === 429) {
+        attempt++;
+        if (attempt < MAX_TRIES) {
+          const waitTime = 10000 * attempt; // 10s then 20s
+          console.warn(`[AI 429] Groq rate limited. Retrying in ${waitTime/1000}s... (Attempt ${attempt}/${MAX_TRIES})`);
+          await delay(waitTime);
+          continue;
+        }
+        
+        console.warn(`[AI FALLBACK] Groq exhausted. Switching to Gemini...`);
+        
+        // 2. Try Gemini (Secondary)
+        try {
+          const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
+          const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+          const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+          });
+          const text = result.response.text();
+          return { choices: [{ message: { content: text } }] };
+        } catch (gemError: any) {
+          const isGemQuota = gemError.message?.includes('429') || gemError.status === 429;
+          
+          if (isGemQuota && process.env.OPENAI_API_KEY) {
+            console.warn(`[AI FALLBACK] Gemini Quota hit. Cooling down (10s) for OpenAI...`);
+            await delay(10000);
+            
+            // 3. Try OpenAI (Tertiary)
+            try {
+              console.warn(`[AI FALLBACK] Switching to OpenAI (GPT-4o-mini)...`);
+              return await openai.chat.completions.create({
+                ...options,
+                model: "gpt-4o-mini"
+              });
+            } catch (oaError: any) {
+              console.error("[CRITICAL AI FAILURE] Provider wipeout.", oaError);
+              throw new Error(`CRITICAL: All AI providers at quota. Please wait 120 seconds and try again.`);
+            }
+          }
+          throw gemError;
+        }
+      }
+      throw e;
+    }
+  }
+
+  throw new Error("AI call failed to return a valid response after all retries and fallbacks.");
 }
 
 /**
@@ -240,7 +266,7 @@ async function generateOutline(keyword: string) {
       },
       {
         role: "user",
-        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Each section must have 'title' and 'targetWordCount' (total must reach 2,000 words).`
+        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Each section must have 'title' and 'targetWordCount' (total must reach 1,000 words).`
       }
     ],
     model: REASONING_MODEL,
@@ -278,7 +304,7 @@ async function generateSection(title: string, keyword: string, productContext: s
 
 // 2. Reasoning Agent (Multi-Pass Coordinator)
 export async function generateArticle(keyword: string): Promise<DraftArticle> {
-  console.log(`[REASONING] Starting 2,000-word Multi-Pass cycle for: '${keyword}'...`);
+  console.log(`[REASONING] Starting 1,000-word Multi-Pass cycle for: '${keyword}'...`);
   
   try {
     const products = await findAffiliateProducts(keyword);

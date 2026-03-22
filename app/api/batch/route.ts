@@ -61,9 +61,10 @@ export async function POST(request: Request) {
           indexing: indexingResult.success
         });
 
-        // Small cooldown between articles to breathe
+        // Longer cooldown between articles to respect free-tier RPM
         if (index < targetTrends.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          console.log(`[BATCH] Cooling down for 15s...`);
+          await new Promise(resolve => setTimeout(resolve, 15000));
         }
       } catch (err: any) {
         completedActions.push({ keyword: trend.keyword, error: err.message });
