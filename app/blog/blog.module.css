@@ -227,3 +227,52 @@
 .articleBody strong {
   color: #3b82f6;
 }
+
+@media (max-width: 768px) {
+  .blogContainer {
+    padding: 100px 16px 40px;
+  }
+  
+  .header h1 {
+    font-size: 2.2rem;
+  }
+  
+  .header p {
+    font-size: 1rem;
+  }
+  
+  .postGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .readerContainer {
+    padding: 100px 16px 60px;
+  }
+  
+  .readerTitle {
+    font-size: 2.2rem;
+  }
+  
+  .readerMeta {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .articleBody {
+    font-size: 1.1rem;
+  }
+  
+  .articleBody h2 {
+    font-size: 1.7rem;
+    margin: 40px 0 20px;
+  }
+
+  .articleBody h3 {
+    font-size: 1.4rem;
+  }
+  
+  .featuredImageArea {
+    border-radius: 16px;
+    margin-bottom: 40px;
+  }
+}

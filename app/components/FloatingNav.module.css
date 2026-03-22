@@ -79,3 +79,45 @@
   border-radius: 50%;
   border: 2px solid var(--accent-1);
 }
+
+@media (max-width: 768px) {
+  .navContainer {
+    width: 95%;
+    padding: 0 16px;
+    height: 60px;
+    top: 16px;
+  }
+  
+  .logo {
+    font-size: 0.95rem;
+  }
+  
+  .pulseDot {
+    width: 6px;
+    height: 6px;
+  }
+
+  /* Make links horizontally scrollable like a swipe-menu */
+  .links {
+    flex: 1;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin: 0 16px;
+    padding-bottom: 4px; /* Space for scrollbar if visible */
+    scrollbar-width: none; /* Firefox */
+  }
+  
+  .links::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+  
+  .link {
+    font-size: 0.85rem;
+  }
+  
+  .signInBtn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 12px;
+  }
+}
