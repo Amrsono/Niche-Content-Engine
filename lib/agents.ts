@@ -146,6 +146,7 @@ async function callGroq(options: any): Promise<any> {
             const text = result.response.text();
             return { choices: [{ message: { content: text } }] };
           } catch (gemError: any) {
+            console.error("[GEMINI ERROR]", stringifyError(gemError));
             const isGemQuota = gemError.message?.includes('429') || gemError.status === 429 || gemError.message?.includes('quota');
             if (isGemQuota) {
               providerCooldowns.gemini = Date.now() + COOLDOWN_DURATION;
@@ -162,8 +163,8 @@ async function callGroq(options: any): Promise<any> {
                   });
                 } catch (oaError: any) {
                   providerCooldowns.openai = Date.now() + COOLDOWN_DURATION;
-                  console.error("[CRITICAL AI FAILURE] Total wipeout.", oaError);
-                  throw new Error(`CRITICAL: All providers (Groq, Gemini, OpenAI) at quota. System Cooling Down for 60s.`);
+                  console.error("[OPENAI ERROR]", stringifyError(oaError));
+                  throw new Error(`CRITICAL: All providers exhausted. Latest error: ${stringifyError(oaError)}`);
                 }
               }
             }
