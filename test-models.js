@@ -21,6 +21,24 @@ async function list() {
   } catch (e) {
     console.error("Error with gemini-1.5-flash-latest:", e.message);
   }
+
+  try {
+    console.log("Checking gemini-flash-latest...");
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const result = await model.generateContent("test");
+    console.log("Success with gemini-flash-latest!");
+  } catch (e) {
+    console.error("Error with gemini-flash-latest:", e.message);
+  }
+
+  try {
+    console.log("Checking gemini-2.0-flash...");
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent("test");
+    console.log("Success with gemini-2.0-flash!");
+  } catch (e) {
+    console.error("Error with gemini-2.0-flash:", e.message);
+  }
 }
 
 list();

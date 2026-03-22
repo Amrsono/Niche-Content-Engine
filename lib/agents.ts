@@ -347,6 +347,7 @@ export async function publishToInstagram(article: DraftArticle): Promise<Publish
   // Aggressive sanitization: remove any invisible characters or quotes
   const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
 
+
   if (!businessId || !token) {
     console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
     return { status: "skipped", message: "Instagram credentials missing", platform: "Instagram" };
