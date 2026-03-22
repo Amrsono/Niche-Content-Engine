@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Explicitly using the model name without v1beta alias if possible
     const model = genAI.getGenerativeModel({ model: modelName });
     
     // Very simple request to test connectivity

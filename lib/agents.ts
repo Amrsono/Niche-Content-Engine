@@ -84,7 +84,7 @@ function getAI() {
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
 const FAST_MODEL = "llama-3.1-8b-instant"; // For small tasks
-const FALLBACK_MODEL = "gemini-flash-latest";
+const FALLBACK_MODEL = "gemini-1.5-flash";
 
 // Global Provider Cooldowns
 const providerCooldowns: Record<string, number> = {

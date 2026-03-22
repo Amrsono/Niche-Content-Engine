@@ -6,10 +6,8 @@ import { AlertCircle, CheckCircle2, Play, Activity } from 'lucide-react';
 import styles from './diagnostic.module.css';
 
 const MODELS_TO_TEST = [
-  "gemini-1.5-flash-latest",
-  "gemini-1.5-pro",
-  "gemini-pro",
   "gemini-1.5-flash",
+  "gemini-1.5-pro",
   "gemini-2.0-flash",
   "gemini-1.5-flash-8b"
 ];
