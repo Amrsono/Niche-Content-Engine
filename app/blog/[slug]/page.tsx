@@ -6,7 +6,8 @@ import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
 import AdSenseInArticle from '@/app/components/AdSenseInArticle';
 import AdSenseDisplay from '@/app/components/AdSenseDisplay';
-import { use } from 'react';
+import { use, useEffect } from 'react';
+import { trackView } from '@/lib/analytics';
 
 /**
  * Splits HTML content after the Nth closing </p> tag.
@@ -28,6 +29,14 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
   const { slug } = use(params);
   const { posts } = usePosts();
   const post = posts.find(p => p.slug === slug);
+
+  // Track a view on every visit
+  useEffect(() => {
+    if (post?.slug) {
+      trackView(post.slug);
+    }
+  }, [post?.slug]);
+
 
   // Show loading state while localStorage hydrates
   if (posts.length === 0) {

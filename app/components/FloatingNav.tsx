@@ -27,6 +27,9 @@ export function FloatingNav() {
         <Link href="/about" className={styles.link}>About</Link>
         <Link href="/contact" className={styles.link}>Contact</Link>
         <Link href="/analytics" className={styles.link}>Analytics</Link>
+        {isSignedIn && (
+          <Link href="/history" className={styles.link} style={{ color: '#a78bfa' }}>History</Link>
+        )}
         <Link href="/diagnostic" className={styles.link} style={{ color: 'var(--accent-1)' }}>Diagnostic</Link>
         <Link href="#" className={styles.link}>Settings</Link>
       </div>
