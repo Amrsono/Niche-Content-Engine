@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPostBySlug, updatePost } from '@/lib/storage';
-import { publishToInstagram, publishToTwitter } from '@/lib/agents';
+import { publishToInstagram, publishToTwitter, publishToTikTok } from '@/lib/agents';
 import type { Post } from '@/lib/types';
 
 export async function POST(request: Request) {
@@ -29,10 +29,13 @@ export async function POST(request: Request) {
     };
 
     // 2. Trigger the agent
+    const blogUrl = `${origin}/blog/${post.slug}`;
     if (platform === 'twitter') {
-      result = await publishToTwitter(article, `${origin}/blog/${post.slug}`);
+      result = await publishToTwitter(article, blogUrl);
     } else if (platform === 'instagram') {
-      result = await publishToInstagram(article);
+      result = await publishToInstagram(article, blogUrl);
+    } else if (platform === 'tiktok') {
+      result = await publishToTikTok(article, blogUrl);
     } else {
       return NextResponse.json({ success: false, error: 'Invalid platform' }, { status: 400 });
     }
@@ -42,6 +45,7 @@ export async function POST(request: Request) {
       const updates: Partial<Post> = {};
       if (platform === 'twitter') updates.twitterUrl = result.url;
       if (platform === 'instagram') updates.instagramUrl = result.url;
+      if (platform === 'tiktok') updates.tiktokUrl = result.url;
 
       await updatePost(post.id, updates);
       return NextResponse.json({ success: true, url: result.url });

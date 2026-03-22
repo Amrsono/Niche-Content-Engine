@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, updatePost, PublishResult } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 
 export async function POST(request: Request) {
@@ -31,18 +31,23 @@ export async function POST(request: Request) {
         // Publish (Local Pulse Blog)
         const publishResult: PublishResult = await publishToLocal(article, trend.keyword);
         
-        // Social Signal - Instagram & X/Twitter
-        const igResult = await publishToInstagram(article);
-        const xResult = await publishToTwitter(article, publishResult.url);
+        // Social Signal - Instagram, X/Twitter & TikTok
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
+        const absoluteUrl = `${siteUrl}${publishResult.url}`;
+        
+        const igResult = await publishToInstagram(article, absoluteUrl);
+        const xResult = await publishToTwitter(article, absoluteUrl);
+        const tkResult = await publishToTikTok(article, absoluteUrl);
         
         // Indexing (Fast-Track)
-        const indexingResult = await requestIndexing(publishResult.url || `https://yoursite.com/${trend.keyword}`);
+        const indexingResult = await requestIndexing(absoluteUrl);
         
         // Save Social Links to Local Pulse if applicable
         if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
           await updatePost(publishResult.id, {
             instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
             twitterUrl: xResult.status === 'success' ? xResult.url : undefined,
+            tiktokUrl: tkResult.status === 'success' ? tkResult.url : undefined,
           });
         }
         
@@ -52,6 +57,7 @@ export async function POST(request: Request) {
           url: publishResult.url,
           instagram: igResult.status === 'success' ? igResult.url : igResult.status,
           twitter: xResult.status === 'success' ? xResult.url : xResult.status,
+          tiktok: tkResult.status === 'success' ? tkResult.url : tkResult.status,
           indexing: indexingResult.success
         });
 

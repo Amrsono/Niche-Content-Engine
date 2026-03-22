@@ -63,3 +63,39 @@ export async function updatePost(id: string, updates: Partial<Post>) {
   return posts[index];
 }
 
+const SETTINGS_FILE = path.resolve(DATA_DIR, 'settings.json');
+
+async function getAllSettings(): Promise<Record<string, any>> {
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    return {};
+  }
+  try {
+    const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSettings(key: string, value: any) {
+  try {
+    const settings = await getAllSettings();
+    settings[key] = value;
+    
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    return true;
+  } catch (error) {
+    console.error(`[STORAGE ERROR] Failed to save settings: ${key}`, error);
+    return false;
+  }
+}
+
+export async function getSettings(key: string): Promise<any> {
+  const settings = await getAllSettings();
+  return settings[key];
+}
+

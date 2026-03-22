@@ -2,8 +2,61 @@ import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
-import { savePost, updatePost } from "./storage";
+import { savePost, updatePost, getSettings, saveSettings } from "./storage";
 export { updatePost };
+
+async function getTikTokToken() {
+  const auth = await getSettings('tiktok_auth');
+  if (!auth) return null;
+
+  const now = Date.now();
+  // Buffer of 5 minutes before actual expiration
+  if (now < (auth.expires_at - 300000)) {
+    return auth.access_token;
+  }
+
+  // Token expired or near expiration, try refresh
+  console.log(`[TIKTOK] 🔄 Token expired. Refreshing...`);
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+
+  try {
+    const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache'
+      },
+      body: new URLSearchParams({
+        client_key: clientKey || '',
+        client_secret: clientSecret || '',
+        grant_type: 'refresh_token',
+        refresh_token: auth.refresh_token
+      })
+    });
+
+    const data = await res.json();
+    if (data.access_token) {
+      const newAuth = {
+        ...auth,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in * 1000),
+        refresh_expires_at: Date.now() + (data.refresh_expires_in * 1000),
+        updated_at: new Date().toISOString()
+      };
+      await saveSettings('tiktok_auth', newAuth);
+      console.log(`[TIKTOK] ✅ Token refreshed successfully.`);
+      return data.access_token;
+    } else {
+      console.error('[TIKTOK REFRESH ERROR]', JSON.stringify(data, null, 2));
+      return null;
+    }
+  } catch (error) {
+    console.error('[TIKTOK REFRESH FETCH ERROR]', error);
+    return null;
+  }
+}
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -65,6 +118,31 @@ async function callGroq(options: any) {
       }
     }
     throw e;
+  }
+}
+
+/**
+ * Generates 3-5 high-engagement hashtags based on article content.
+ */
+async function generateHashtags(title: string, content: string): Promise<string> {
+  try {
+    const chatCompletion = await callGroq({
+      messages: [
+        {
+          role: "system",
+          content: "You are a social media growth expert. Generate 5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces."
+        },
+        {
+          role: "user",
+          content: `Title: ${title}\nContent: ${content.substring(0, 500)}...`
+        }
+      ],
+      model: DISCOVERY_MODEL
+    });
+    return chatCompletion.choices[0].message.content?.trim() || "#niche #pulse2026 #contentengine";
+  } catch (err) {
+    console.warn("[SOCIAL] Hashtag generation failed, using fallbacks.");
+    return "#niche #pulse2026 #contentengine";
   }
 }
 
@@ -339,7 +417,7 @@ export async function publishToSanity(article: DraftArticle): Promise<PublishRes
   return { status: "error", message: "Sanity Project ID missing", platform: "Sanity" };
 }
 
-export async function publishToInstagram(article: DraftArticle): Promise<PublishResult> {
+export async function publishToInstagram(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
   const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID?.trim();
   // Aggressive sanitization: remove any invisible characters or quotes
   const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
@@ -351,11 +429,22 @@ export async function publishToInstagram(article: DraftArticle): Promise<Publish
   }
 
   try {
-    console.log(`[SOCIAL] Creating Instagram media container...`);
+    console.log(`[SOCIAL] Creating Instagram media container for: ${article.title}`);
     
-    // Step 1: Create Media Container
-    // Caption includes the title and some hashtags
-    const caption = `${article.title}\n\n${article.metaDescription}\n\n#niche #pulse2026 #contentengine`;
+    // Step 1: Generate Dynamic Hashtags
+    const hashtags = await generateHashtags(article.title, article.content);
+    
+    // Step 2: Create Media Container
+    // Caption includes the title, meta, link (textual) and dynamic hashtags
+    let caption = `${article.title}\n\n${article.metaDescription}`;
+    
+    if (blogUrl) {
+      caption += `\n\n🔗 Read More: ${blogUrl}\n👉 Link in Bio for more pulses!`;
+    } else {
+      caption += `\n\n👉 Link in Bio for more pulses!`;
+    }
+    
+    caption += `\n\n${hashtags}`;
     
     // Move access_token to Query String for maximum reliability
     const containerRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`, {
@@ -464,9 +553,11 @@ export async function publishToTwitter(article: DraftArticle, blogUrl?: string):
   try {
     console.log(`[SOCIAL] Composing tweet for: ${article.title}`);
 
-    // Compose the tweet (280 char limit)
+    // Step 1: Generate Dynamic Hashtags
+    const hashtags = await generateHashtags(article.title, article.content);
+
+    // Step 2: Compose the tweet (280 char limit)
     const link = blogUrl || '';
-    const hashtags = '#ContentEngine #NichePulse #AI2026';
     const titleTruncated = article.title.length > 120 ? article.title.substring(0, 117) + '...' : article.title;
     const metaSnippet = article.metaDescription.length > 80 ? article.metaDescription.substring(0, 77) + '...' : article.metaDescription;
     
@@ -476,7 +567,12 @@ export async function publishToTwitter(article: DraftArticle, blogUrl?: string):
 
     // Ensure under 280 chars
     if (tweetText.length > 280) {
-      tweetText = tweetText.substring(0, 277) + '...';
+      // Try to preserve the link and hashtags, truncate the text/meta
+      const reservedLength = (link ? link.length + 5 : 0) + hashtags.length + 5; 
+      const available = 280 - reservedLength;
+      tweetText = `🚀 ${titleTruncated.substring(0, available / 2)}\n\n${metaSnippet.substring(0, available / 2)}...`;
+      if (link) tweetText += `\n\n🔗 ${link}`;
+      tweetText += `\n\n${hashtags}`;
     }
 
     // Twitter API v2 endpoint
@@ -526,15 +622,73 @@ export async function publishToTwitter(article: DraftArticle, blogUrl?: string):
   }
 }
 
-export async function publishToTikTok(article: DraftArticle): Promise<PublishResult> {
-  console.log(`[SOCIAL] Syncing with TikTok Creative Center...`);
-  // Realistic implementation would use TikTok Content Posting API
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  return { 
-    status: "success", 
-    url: "https://tiktok.com/@niche_engine/video/123", 
-    platform: "TikTok" 
-  };
+export async function publishToTikTok(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
+  const token = await getTikTokToken();
+
+  if (!token) {
+    console.warn(`[SOCIAL WARNING] TikTok token missing or expired. Connect via /api/auth/tiktok/connect`);
+    return { 
+      status: "skipped", 
+      message: "TikTok not connected. Visit /api/auth/tiktok/connect to authorize.", 
+      platform: "TikTok" 
+    };
+  }
+
+  try {
+    console.log(`[SOCIAL] Initializing TikTok Direct Post for: ${article.title}`);
+    
+    // Step 1: Generate Dynamic Hashtags
+    const hashtags = await generateHashtags(article.title, article.content);
+    
+    // Step 2: Compose Caption
+    let caption = `${article.title}\n\n${article.metaDescription}`;
+    if (blogUrl) caption += `\n\n🔗 Full Pulse: ${blogUrl}`;
+    caption += `\n\n${hashtags}`;
+
+    // TikTok Direct Post V2 - Photos via URL
+    // Note: char limit is 2,200 but line breaks might be ignored by some TikTok clients
+    const res = await fetch('https://open.tiktokapis.com/v2/post/publish/content/init/', {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        post_info: {
+          title: article.title.substring(0, 90), // TikTok title limit
+          description: caption.substring(0, 2100), // Safety margin
+          privacy_level: "PUBLIC_TO_EVERYONE",
+          disable_comment: false,
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          photo_urls: [article.ogImageUrl],
+        },
+        post_mode: "MEDIA_POST",
+        media_type: "PHOTO",
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+       console.error('[TIKTOK ERROR]', JSON.stringify(data, null, 2));
+       throw new Error(data.error?.message || `TikTok API error (${res.status})`);
+    }
+
+    // TikTok posting is asynchronous, return the publish_id
+    const publishId = data.data?.publish_id;
+    console.log(`[SOCIAL] ✅ TikTok Pulse Initiated: ${publishId}`);
+
+    return { 
+      status: "success", 
+      url: `https://tiktok.com/publish/${publishId}`, // Placeholder until processed
+      id: publishId,
+      platform: "TikTok" 
+    };
+  } catch (error: any) {
+    console.error(`[SOCIAL ERROR] TikTok failed: ${error.message}`);
+    return { status: "error", message: error.message, platform: "TikTok" };
+  }
 }
 
 // Scheduling Helper
