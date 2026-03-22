@@ -268,21 +268,18 @@ export async function generateOgImage(title: string): Promise<string> {
     const vertexProjectId = process.env.VERTEX_PROJECT_ID;
 
     if (openaiKey) {
-      console.log(`[SEO] Calling DALL-E 3 API...`);
-      // Simulating call to OpenAI DALL-E 3
-      return `https://rebrand.ly/generated-dalle-placeholder?prompt=${encodeURIComponent(imagePrompt)}`;
+      console.log(`[SEO] Calling DALL-E 3 API (Simulated)...`);
+      return `https://images.unsplash.com/photo-1677442136019-21780ecad995?fm=jpg&w=1200&h=630&fit=crop`; 
     }
 
     if (vertexProjectId) {
-      console.log(`[SEO] Calling Google Imagen API...`);
-      // Simulating call to Vertex AI Imagen
-      return `https://rebrand.ly/generated-imagen-placeholder?prompt=${encodeURIComponent(imagePrompt)}`;
+      console.log(`[SEO] Calling Google Imagen API (Simulated)...`);
+      return `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?fm=jpg&w=1200&h=630&fit=crop`;
     }
 
     // C. Fallback to high-quality Unsplash if no keys
     console.log(`[SEO] No AI keys found. Falling back to Unsplash.`);
-    const term = encodeURIComponent(title.split(' ').slice(0, 2).join(' '));
-    return `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1200&h=630`;
+    return `https://images.unsplash.com/photo-1518770660439-4636190af475?fm=jpg&w=1200&h=630&fit=crop&q=80`;
   } catch (err) {
     console.warn(`[SEO ERROR] Image generation failed:`, err);
     return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
