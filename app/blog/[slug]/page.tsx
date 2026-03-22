@@ -6,6 +6,7 @@ import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
 import AdSenseInArticle from '@/app/components/AdSenseInArticle';
 import AdSenseDisplay from '@/app/components/AdSenseDisplay';
+import AmazonAdBanner from '@/app/components/AmazonAdBanner';
 import { use, useEffect } from 'react';
 import { trackView } from '@/lib/analytics';
 
@@ -96,8 +97,11 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
           dangerouslySetInnerHTML={{ __html: contentAfter }}
         />
 
-        {/* Display ad at the bottom of each article */}
-        <AdSenseDisplay style={{ marginTop: '3rem' }} />
+        {/* Amazon Shopping Ad placeholder */}
+        <AmazonAdBanner />
+
+        {/* Display ad at the very bottom of each article */}
+        <AdSenseDisplay style={{ marginTop: '1rem' }} />
       </article>
     </main>
   );
