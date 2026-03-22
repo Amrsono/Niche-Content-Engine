@@ -250,7 +250,8 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
     return (data.trends || []).map((t: any) => ({ ...t, niche }));
   } catch (err: any) {
     console.error("[DISCOVERY ERROR]", err);
-    throw new Error(`Real-time Discovery failed: ${err.message}`);
+    const errorMsg = err?.message || err?.toString() || "Unknown Discovery Error";
+    throw new Error(`Real-time Discovery failed: ${errorMsg}`);
   }
 }
 
@@ -277,24 +278,30 @@ async function findAffiliateProducts(keyword: string) {
 
 // Multi-Pass Step 1: Generate Outline
 async function generateOutline(keyword: string) {
-  const chatCompletion = await callGroq({
-    messages: [
-      {
-        role: "system",
-        content: "You are an expert content strategist. Create a comprehensive outline for a 2,000-word deep-dive article."
-      },
-      {
-        role: "user",
-        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Focus on quality over quantity. Max 4-5 sections total targeting 1,000 words total.`
-      }
-    ],
-    model: REASONING_MODEL,
-    response_format: { type: "json_object" }
-  });
-  
-  const content = chatCompletion.choices[0].message.content || "{}";
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : content).sections || [];
+  try {
+    const chatCompletion = await callGroq({
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert content strategist. Create a comprehensive outline for a 2,000-word deep-dive article."
+        },
+        {
+          role: "user",
+          content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Focus on quality over quantity. Max 4-5 sections total targeting 1,000 words total.`
+        }
+      ],
+      model: REASONING_MODEL,
+      response_format: { type: "json_object" }
+    });
+    
+    const content = chatCompletion.choices[0].message.content || "{}";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : content).sections || [];
+  } catch (err: any) {
+    console.error("[OUTLINE ERROR]", err);
+    const errorMsg = err?.message || err?.toString() || "Unknown Outline Error";
+    throw new Error(`Outline generation failed: ${errorMsg}`);
+  }
 }
 
 // Multi-Pass Step 2: Generate Individual Section
