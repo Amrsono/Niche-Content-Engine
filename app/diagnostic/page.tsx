@@ -6,10 +6,11 @@ import { AlertCircle, CheckCircle2, Play, Activity } from 'lucide-react';
 import styles from './diagnostic.module.css';
 
 const MODELS_TO_TEST = [
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash-8b"
+  "gemini-2.5-flash",     // ✅ Active fallback
+  "gemini-flash-latest",  // Maps to gemini-3-flash (20 req/day limit)
+  "gemini-pro-latest",    // Maps to gemini-3.1-pro (limit: 0)
+  "gemini-2.5-pro",       // Limit: 0
+  "gemini-2.0-flash"      // Limit: 0
 ];
 
 export default function DiagnosticPage() {
