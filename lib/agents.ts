@@ -562,9 +562,21 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
        throw new Error(`${fbError} ${fbCode}`);
     }
 
+    // Fetch the actual permalink for the published media
+    let finalUrl = `https://instagram.com/p/${publishData.id}`;
+    try {
+      const mediaRes = await fetch(`https://graph.facebook.com/v20.0/${publishData.id}?fields=permalink&access_token=${token}`);
+      const mediaData = await mediaRes.json();
+      if (mediaData.permalink) {
+        finalUrl = mediaData.permalink;
+      }
+    } catch (e) {
+      console.warn('[SOCIAL] Failed to fetch instagram permalink, falling back to ID');
+    }
+
     return { 
       status: "success", 
-      url: `https://instagram.com/reels/${publishData.id}`, 
+      url: finalUrl, 
       platform: "Instagram" 
     };
   } catch (error: any) {
