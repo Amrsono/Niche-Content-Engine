@@ -4,7 +4,24 @@ import { usePosts } from '@/lib/useLocalPosts';
 import { notFound } from 'next/navigation';
 import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
+import AdSenseInArticle from '@/app/components/AdSenseInArticle';
 import { use } from 'react';
+
+/**
+ * Splits HTML content after the Nth closing </p> tag.
+ * Returns [before, after] — both are valid HTML strings.
+ */
+function splitAfterNthParagraph(html: string, n: number): [string, string] {
+  let count = 0;
+  let idx = 0;
+  while (count < n && idx < html.length) {
+    const next = html.indexOf('</p>', idx);
+    if (next === -1) break;
+    count++;
+    idx = next + 4; // length of '</p>'
+  }
+  return [html.slice(0, idx), html.slice(idx)];
+}
 
 export default function PostReader({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -24,6 +41,8 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
   if (!post) {
     notFound();
   }
+
+  const [contentBefore, contentAfter] = splitAfterNthParagraph(post.content, 2);
 
   return (
     <main className={styles.blogContainer}>
@@ -52,11 +71,22 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
           />
         </div>
 
+        {/* First 2 paragraphs */}
         <div 
           className={styles.articleBody}
-          dangerouslySetInnerHTML={{ __html: post.content }}
+          dangerouslySetInnerHTML={{ __html: contentBefore }}
+        />
+
+        {/* In-article ad — placed after 2nd paragraph as per Google's recommendation */}
+        <AdSenseInArticle />
+
+        {/* Rest of article */}
+        <div 
+          className={styles.articleBody}
+          dangerouslySetInnerHTML={{ __html: contentAfter }}
         />
       </article>
     </main>
   );
 }
+
