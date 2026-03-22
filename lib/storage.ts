@@ -11,6 +11,7 @@ export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) 
   try {
     console.log(`[STORAGE] Attempting save to: ${POSTS_FILE}`);
     const posts = await getPosts();
+    console.log(`[STORAGE] Currently have ${posts.length} posts. unshifting new one...`);
     
     const newPost: Post = {
       ...post,
@@ -36,11 +37,19 @@ export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) 
 }
 
 export async function getPosts(): Promise<Post[]> {
-  if (!fs.existsSync(POSTS_FILE)) {
+  try {
+    if (!fs.existsSync(POSTS_FILE)) {
+      console.log(`[STORAGE] ${POSTS_FILE} not found. Returning empty array.`);
+      return [];
+    }
+    const data = fs.readFileSync(POSTS_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    console.log(`[STORAGE] Read ${parsed.length} posts from ${POSTS_FILE}`);
+    return parsed;
+  } catch (error: any) {
+    console.error(`[STORAGE ERROR] Failed to read posts: ${error.message}`);
     return [];
   }
-  const data = fs.readFileSync(POSTS_FILE, 'utf-8');
-  return JSON.parse(data);
 }
 
 export async function getPostBySlug(slug: string): Promise<Post | undefined> {

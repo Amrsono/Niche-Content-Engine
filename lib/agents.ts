@@ -365,7 +365,8 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
     };
   } catch (err: any) {
     console.error("[REASONING ERROR]", err);
-    throw new Error(`Multi-Pass Reasoning failed: ${err.message}`);
+    const errorMsg = err?.message || err?.toString() || "Unknown Multi-Pass Error";
+    throw new Error(`Multi-Pass Reasoning failed: ${errorMsg}`);
   }
 }
 
@@ -416,22 +417,29 @@ export async function generateOgImage(title: string): Promise<string> {
 
 // 4. Auto-Publisher (WordPress / Sanity / Local)
 export async function publishToLocal(article: DraftArticle, keyword: string): Promise<PublishResult> {
-  console.log(`[PUBLISHER] Saving to local blog storage...`);
-  const post = await savePost({
-    title: article.title,
-    content: article.content,
-    metaDescription: article.metaDescription,
-    ogImageUrl: article.ogImageUrl,
-    status: 'published',
-    keyword: keyword
-  });
-  
-  return { 
-    status: "success", 
-    id: post.id,
-    url: `/blog/${post.slug}`, 
-    platform: "Local-Pulse-Blog"
-  };
+  console.log(`[PUBLISHER] Attempting to save '${article.title}' to local storage...`);
+  try {
+    const post = await savePost({
+      title: article.title,
+      content: article.content,
+      metaDescription: article.metaDescription,
+      ogImageUrl: article.ogImageUrl,
+      status: 'published',
+      keyword: keyword
+    });
+    
+    console.log(`[PUBLISHER] ✅ Saved successfully as ID: ${post.id}. Slug: ${post.slug}`);
+    
+    return { 
+      status: "success", 
+      id: post.id,
+      url: `/blog/${post.slug}`, 
+      platform: "Local-Pulse-Blog"
+    };
+  } catch (error: any) {
+    console.error(`[PUBLISHER ERROR] Local save failed: ${error.message}`);
+    throw error;
+  }
 }
 export async function publishToWordpress(article: DraftArticle): Promise<PublishResult> {
   console.log(`[PUBLISHER] Preparing for WordPress publication...`);
