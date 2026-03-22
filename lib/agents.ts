@@ -74,8 +74,16 @@ const REASONING_MODEL = "llama-3.3-70b-versatile";
 const FAST_MODEL = "llama-3.1-8b-instant"; // For small tasks
 const FALLBACK_MODEL = "gemini-flash-latest";
 
-// Global Fallback Helper
-// Global Fallback Helper with Exponential Backoff
+// Global Provider Cooldowns
+const providerCooldowns: Record<string, number> = {
+  groq: 0,
+  gemini: 0,
+  openai: 0
+};
+
+const COOLDOWN_DURATION = 60000; // 60 seconds
+
+// Global Fallback Helper with Exponential Backoff and Cooldowns
 async function callGroq(options: any): Promise<any> {
   const { groq, genAI, openai } = getAI();
   
@@ -95,13 +103,19 @@ async function callGroq(options: any): Promise<any> {
 
   while (attempt < MAX_TRIES) {
     try {
-      // 1. Try Groq (Primary)
-      return await groq.chat.completions.create(options);
+      // 1. Try Groq (Primary) - Only if not cooling down
+      if (Date.now() > providerCooldowns.groq) {
+        return await groq.chat.completions.create(options);
+      } else {
+        console.warn(`[AI] Groq is cooling down. Skipping to fallback...`);
+        throw { status: 429 }; // Force fallback
+      }
     } catch (e: any) {
       if (e.status === 429) {
+        providerCooldowns.groq = Date.now() + COOLDOWN_DURATION;
         attempt++;
         if (attempt < MAX_TRIES) {
-          const waitTime = 10000 * attempt; // 10s then 20s
+          const waitTime = 15000 * attempt; // 15s then 30s
           console.warn(`[AI 429] Groq rate limited. Retrying in ${waitTime/1000}s... (Attempt ${attempt}/${MAX_TRIES})`);
           await delay(waitTime);
           continue;
@@ -110,34 +124,39 @@ async function callGroq(options: any): Promise<any> {
         console.warn(`[AI FALLBACK] Groq exhausted. Switching to Gemini...`);
         
         // 2. Try Gemini (Secondary)
-        try {
-          const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-          const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-          const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-          });
-          const text = result.response.text();
-          return { choices: [{ message: { content: text } }] };
-        } catch (gemError: any) {
-          const isGemQuota = gemError.message?.includes('429') || gemError.status === 429;
-          
-          if (isGemQuota && process.env.OPENAI_API_KEY) {
-            console.warn(`[AI FALLBACK] Gemini Quota hit. Cooling down (10s) for OpenAI...`);
-            await delay(10000);
-            
-            // 3. Try OpenAI (Tertiary)
-            try {
-              console.warn(`[AI FALLBACK] Switching to OpenAI (GPT-4o-mini)...`);
-              return await openai.chat.completions.create({
-                ...options,
-                model: "gpt-4o-mini"
-              });
-            } catch (oaError: any) {
-              console.error("[CRITICAL AI FAILURE] Provider wipeout.", oaError);
-              throw new Error(`CRITICAL: All AI providers at quota. Please wait 120 seconds and try again.`);
+        if (Date.now() > providerCooldowns.gemini) {
+          try {
+            const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
+            const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+            const result = await model.generateContent({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+            });
+            const text = result.response.text();
+            return { choices: [{ message: { content: text } }] };
+          } catch (gemError: any) {
+            const isGemQuota = gemError.message?.includes('429') || gemError.status === 429 || gemError.message?.includes('quota');
+            if (isGemQuota) {
+              providerCooldowns.gemini = Date.now() + COOLDOWN_DURATION;
+              
+              if (process.env.OPENAI_API_KEY && Date.now() > providerCooldowns.openai) {
+                console.warn(`[AI FALLBACK] Gemini Quota also hit. Cooling down (15s) for OpenAI...`);
+                await delay(15000);
+                
+                // 3. Try OpenAI (Tertiary)
+                try {
+                  return await openai.chat.completions.create({
+                    ...options,
+                    model: "gpt-4o-mini"
+                  });
+                } catch (oaError: any) {
+                  providerCooldowns.openai = Date.now() + COOLDOWN_DURATION;
+                  console.error("[CRITICAL AI FAILURE] Total wipeout.", oaError);
+                  throw new Error(`CRITICAL: All providers (Groq, Gemini, OpenAI) at quota. System Cooling Down for 60s.`);
+                }
+              }
             }
+            throw gemError;
           }
-          throw gemError;
         }
       }
       throw e;
@@ -266,7 +285,7 @@ async function generateOutline(keyword: string) {
       },
       {
         role: "user",
-        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Each section must have 'title' and 'targetWordCount' (total must reach 1,000 words).`
+        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Focus on quality over quantity. Max 4-5 sections total targeting 1,000 words total.`
       }
     ],
     model: REASONING_MODEL,
@@ -317,16 +336,20 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
     let fullContent = "";
     let contextSummary = "";
 
-    // Step 2 & 3: Section Generation & Merging
-    for (const section of sections) {
-      console.log(`[REASONING] Drafting section: ${section.title} (~${section.targetWordCount} words)...`);
-      const sectionHtml = await generateSection(section.title, keyword, productContext, contextSummary, section.targetWordCount);
-      fullContent += sectionHtml + "\n\n";
-      contextSummary += ` Completed: ${section.title}.`;
+    // Step 2 & 3: Section Generation (Merged Passes to reduce API calls)
+    for (let i = 0; i < sections.length; i += 2) {
+      const currentSections = sections.slice(i, i + 2);
+      const sectionTitles = currentSections.map((s: any) => s.title).join(" AND ");
+      const targetWords = currentSections.reduce((acc: number, s: any) => acc + (s.targetWordCount || 250), 0);
       
-      // Delay to respect free-tier rate limits (minimal for Groq, more for safety if fallback happens)
-      // Increasing to 5s as per user preference (willing to wait for quality)
-      await delay(5000); 
+      console.log(`[REASONING] Drafting merged pass (${i/2 + 1}/${Math.ceil(sections.length/2)}): ${sectionTitles} (~${targetWords} words)...`);
+      
+      const sectionHtml = await generateSection(sectionTitles, keyword, productContext, contextSummary, targetWords);
+      fullContent += sectionHtml + "\n\n";
+      contextSummary += ` Completed: ${sectionTitles}.`;
+      
+      // Delay to respect free-tier rate limits
+      await delay(8000); 
     }
 
     // Generate Meta Description with Fallback
