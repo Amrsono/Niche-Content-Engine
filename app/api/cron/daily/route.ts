@@ -1,35 +1,48 @@
 import { NextResponse } from 'next/server';
-import { getNextNiche } from '@/lib/niche-manager';
+import { getNextNiche, addDiscoveredTopics } from '@/lib/niche-manager';
 import { generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost } from '@/lib/agents';
+import { fetchGoogleTrends, scrapeTikTokTrends } from '@/lib/scraper';
 import { requestIndexing } from '@/lib/indexing';
 
-// Vercel Cron sends a GET request
+// Single Daily Cron for Vercel Hobby Limits
 export async function GET(request: Request) {
   try {
     // 1. Security Check
     const authHeader = request.headers.get('authorization');
     if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      // Allow execution in dev or if secret isn't set, but block unauthorized production requests
       if (process.env.NODE_ENV === 'production') {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
     }
 
-    console.log(`[CRON 20-MIN] Waking up to publish new article...`);
+    console.log(`[CRON DAILY] Waking up for daily cycle...`);
     
-    // 2. Determine next topic
+    // --- PART 1: DISCOVERY ---
+    console.log(`[CRON DAILY] Step 1: Discovering new trends...`);
+    try {
+      const [googleTrends, tiktokTrends] = await Promise.all([
+        fetchGoogleTrends(),
+        scrapeTikTokTrends()
+      ]);
+      const keywords: string[] = [];
+      if (googleTrends && Array.isArray(googleTrends)) keywords.push(...googleTrends.slice(0, 5).map((t: any) => t.title as string));
+      if (tiktokTrends && Array.isArray(tiktokTrends)) keywords.push(...tiktokTrends.slice(0, 5).map((t: any) => t.keyword as string));
+      
+      await addDiscoveredTopics(keywords);
+    } catch (e) {
+      console.warn(`[CRON DAILY] Discovery phase failed, but continuing to publish...`, e);
+    }
+
+    // --- PART 2: PUBLISHING ---
+    console.log(`[CRON DAILY] Step 2: Publishing new article...`);
     const keyword = await getNextNiche();
-    console.log(`[CRON 20-MIN] Selected topic from round-robin: ${keyword}`);
+    console.log(`[CRON DAILY] Selected topic: ${keyword}`);
 
-    // 3. Generate content
     const article = await generateArticle(keyword);
-    const ogImageUrl = await generateOgImage(article.title);
-    article.ogImageUrl = ogImageUrl;
+    article.ogImageUrl = await generateOgImage(article.title);
 
-    // 4. Publish to blog
     const publishResult = await publishToLocal(article, keyword);
     
-    // 5. Social signaling
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
     const absoluteUrl = `${siteUrl}${publishResult.url}`;
     
@@ -37,10 +50,8 @@ export async function GET(request: Request) {
     const xResult = await publishToTwitter(article, absoluteUrl);
     const tkResult = await publishToTikTok(article, absoluteUrl);
     
-    // 6. Fast track indexing
-    const indexingResult = await requestIndexing(absoluteUrl);
+    await requestIndexing(absoluteUrl);
 
-    // Save social urls back to post
     if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
       await updatePost(publishResult.id, {
         instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
@@ -54,14 +65,14 @@ export async function GET(request: Request) {
       publishedTopic: keyword,
       url: absoluteUrl,
       socials: {
-        instagram: igResult.status === 'success' ? igResult.url : false,
-        twitter: xResult.status === 'success' ? xResult.url : false,
-        tiktok: tkResult.status === 'success' ? tkResult.url : false,
+        instagram: igResult.status === 'success',
+        twitter: xResult.status === 'success',
+        tiktok: tkResult.status === 'success',
       }
     });
 
   } catch (error: any) {
-    console.error("[CRON 20-MIN ERROR]", error);
+    console.error("[CRON DAILY ERROR]", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
