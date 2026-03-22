@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Routes that require authentication (admin-only)
 const isProtectedRoute = createRouteMatcher([
+  "/",               // Homepage Dashboard
   "/history(.*)",
   "/analytics(.*)",
   "/diagnostic(.*)",
