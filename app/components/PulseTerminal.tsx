@@ -51,7 +51,8 @@ export function PulseTerminal() {
               if (res.indexing) addLog(`[INDEXING] Google notified via API.`, 'info');
             }
           });
-          addLog(`Bulk operation complete. ${data.totalProcessed} articles ready.`, 'system');
+          const successCount = data.results.filter((r: any) => !r.error).length;
+          addLog(`Bulk operation complete. ${successCount}/${data.totalProcessed} articles ready.`, successCount > 0 ? 'system' : 'error');
         } else {
           throw new Error(data.error || "Batch failed");
         }

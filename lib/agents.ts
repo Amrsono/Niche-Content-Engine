@@ -5,6 +5,18 @@ import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
 import { savePost, updatePost, getSettings, saveSettings } from "./storage";
 export { updatePost };
 
+// Utility to safely stringify any error object
+function stringifyError(err: any): string {
+  if (!err) return "Unknown Error";
+  if (typeof err === 'string') return err;
+  if (err.message) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
 async function getTikTokToken() {
   const auth = await getSettings('tiktok_auth');
   if (!auth) return null;
@@ -250,8 +262,7 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
     return (data.trends || []).map((t: any) => ({ ...t, niche }));
   } catch (err: any) {
     console.error("[DISCOVERY ERROR]", err);
-    const errorMsg = err?.message || err?.toString() || "Unknown Discovery Error";
-    throw new Error(`Real-time Discovery failed: ${errorMsg}`);
+    throw new Error(`Real-time Discovery failed: ${stringifyError(err)}`);
   }
 }
 
@@ -299,8 +310,7 @@ async function generateOutline(keyword: string) {
     return JSON.parse(jsonMatch ? jsonMatch[0] : content).sections || [];
   } catch (err: any) {
     console.error("[OUTLINE ERROR]", err);
-    const errorMsg = err?.message || err?.toString() || "Unknown Outline Error";
-    throw new Error(`Outline generation failed: ${errorMsg}`);
+    throw new Error(`Outline generation failed: ${stringifyError(err)}`);
   }
 }
 
@@ -372,8 +382,7 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
     };
   } catch (err: any) {
     console.error("[REASONING ERROR]", err);
-    const errorMsg = err?.message || err?.toString() || "Unknown Multi-Pass Error";
-    throw new Error(`Multi-Pass Reasoning failed: ${errorMsg}`);
+    throw new Error(`Multi-Pass Reasoning failed: ${stringifyError(err)}`);
   }
 }
 

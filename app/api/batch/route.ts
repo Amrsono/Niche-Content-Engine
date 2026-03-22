@@ -71,6 +71,9 @@ export async function POST(request: Request) {
       }
     }
 
+    console.log(`[BATCH] Cycle Complete. Total: ${completedActions.length}. Successes: ${completedActions.filter(a => !a.error).length}`);
+    console.log(`[BATCH] Detailed Results:`, JSON.stringify(completedActions, null, 2));
+
     return NextResponse.json({
       success: true,
       niche,
