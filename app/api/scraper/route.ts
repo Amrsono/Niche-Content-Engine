@@ -34,9 +34,10 @@ export async function POST(request: Request) {
     }
     
     // 5. Social Media Phase (Pulse across Instagram/X/TikTok)
-    const igResult = await publishToInstagram(draft);
-    const xResult = await publishToTwitter(draft, publishResult.url);
-    const ttResult = await publishToTikTok(draft);
+    // Social publishing is now done strictly manually via the UI
+    const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
+    const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
+    const ttResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
 
     // 6. Persistence Update (Link social posts to local storage if using local)
     if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {

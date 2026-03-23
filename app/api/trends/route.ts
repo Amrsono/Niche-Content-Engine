@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { fetchGoogleTrends, scrapeTikTokTrends } from '@/lib/scraper';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const [googleTrends, tiktokTrends] = await Promise.all([
@@ -8,14 +10,14 @@ export async function GET() {
       scrapeTikTokTrends()
     ]);
 
-    // Map trends to random (but stable-ish) global coordinates
+    // Map trends to random (but stable-ish) global coordinates, ensuring they stay safely away from edges to prevent tooltips from being cropped
     const coordinates = [
-      { top: '25%', left: '20%' }, // North America
-      { top: '35%', left: '50%' }, // Europe
-      { top: '45%', left: '85%' }, // Asia/East
+      { top: '35%', left: '25%' }, // North America
+      { top: '45%', left: '50%' }, // Europe
+      { top: '55%', left: '75%' }, // Asia/East
       { top: '65%', left: '30%' }, // South America
       { top: '75%', left: '60%' }, // Africa/South
-      { top: '20%', left: '75%' }, // North Asia
+      { top: '30%', left: '70%' }, // North Asia
     ];
 
     const combined = [

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getNextNiche, addDiscoveredTopics } from '@/lib/niche-manager';
-import { generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost } from '@/lib/agents';
+import { generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost, PublishResult } from '@/lib/agents';
 import { fetchGoogleTrends, scrapeTikTokTrends } from '@/lib/scraper';
 import { requestIndexing } from '@/lib/indexing';
 
@@ -46,9 +46,10 @@ export async function GET(request: Request) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
     const absoluteUrl = `${siteUrl}${publishResult.url}`;
     
-    const igResult = await publishToInstagram(article, absoluteUrl);
-    const xResult = await publishToTwitter(article, absoluteUrl);
-    const tkResult = await publishToTikTok(article, absoluteUrl);
+    // Social publishing is now done strictly manually via the UI
+    const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
+    const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
+    const tkResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
     
     await requestIndexing(absoluteUrl);
 

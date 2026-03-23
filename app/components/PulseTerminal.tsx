@@ -83,10 +83,21 @@ export function PulseTerminal() {
         if (data.socialUrls?.instagram) {
           addLog(`[SOCIAL] Instagram Pulse: [Active]`, 'success');
         } else {
-          addLog(`[SOCIAL] Instagram: [Skipped/Missing Credentials]`, 'info');
+          addLog(`[SOCIAL] Instagram: [Skipped/Manual Only]`, 'info');
         }
         
-        addLog(`[SOCIAL] Posted to TikTok: [Success]`, 'success');
+        if (data.socialUrls?.tiktok) {
+          addLog(`[SOCIAL] TikTok Pulse: [Active]`, 'success');
+        } else {
+          addLog(`[SOCIAL] TikTok: [Skipped/Manual Only]`, 'info');
+        }
+        
+        if (data.socialUrls?.twitter) {
+          addLog(`[SOCIAL] X/Twitter Pulse: [Active]`, 'success');
+        } else {
+          addLog(`[SOCIAL] X/Twitter: [Skipped/Manual Only]`, 'info');
+        }
+        
         await new Promise(r => setTimeout(r, 400));
         
         addLog(`[PUBLISHER] Article live in Pulse Blog!`, 'success');

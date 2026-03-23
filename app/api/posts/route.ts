@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getPosts } from '@/lib/storage';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     console.log(`[API/POSTS] GET request. reading from storage...`);

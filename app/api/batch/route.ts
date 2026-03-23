@@ -35,9 +35,10 @@ export async function POST(request: Request) {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
         const absoluteUrl = `${siteUrl}${publishResult.url}`;
         
-        const igResult = await publishToInstagram(article, absoluteUrl);
-        const xResult = await publishToTwitter(article, absoluteUrl);
-        const tkResult = await publishToTikTok(article, absoluteUrl);
+        // Social publishing is now done strictly manually via the UI
+        const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
+        const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
+        const tkResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
         
         // Indexing (Fast-Track)
         const indexingResult = await requestIndexing(absoluteUrl);

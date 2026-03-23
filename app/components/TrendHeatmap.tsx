@@ -53,7 +53,6 @@ export function TrendHeatmap() {
         position: 'relative', 
         background: 'rgba(255,255,255,0.02)', 
         borderRadius: '16px',
-        overflow: 'hidden',
         border: '1px solid rgba(255,255,255,0.08)',
         boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)'
       }}>
@@ -61,6 +60,8 @@ export function TrendHeatmap() {
         <div style={{
           position: 'absolute',
           inset: 0,
+          borderRadius: '16px',
+          overflow: 'hidden',
           backgroundImage: `
             linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)

@@ -1,17 +1,29 @@
 import fs from 'fs';
 import path from 'path';
+import Redis from 'ioredis';
 import type { Post } from './types';
 
-// On Vercel, only /tmp is writable. In dev, use the local data/ dir.
+// Detect if we have a Redis URL available (supports various env keys just in case)
+const REDIS_URL = process.env.REDIS_URL || process.env.KV_URL;
+const IS_REDIS_ENABLED = !!REDIS_URL;
+
+let redis: Redis | null = null;
+if (IS_REDIS_ENABLED) {
+  redis = new Redis(REDIS_URL!);
+}
+
+// Original Local fallback behavior
 const IS_SERVERLESS = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 const DATA_DIR = IS_SERVERLESS ? '/tmp' : path.resolve(process.cwd(), 'data');
 const POSTS_FILE = path.resolve(DATA_DIR, 'posts.json');
+const SETTINGS_FILE = path.resolve(DATA_DIR, 'settings.json');
+
+const POSTS_KEY = 'niche_engine_posts';
+const SETTINGS_KEY = 'niche_engine_settings';
 
 export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) {
   try {
-    console.log(`[STORAGE] Attempting save to: ${POSTS_FILE}`);
     const posts = await getPosts();
-    console.log(`[STORAGE] Currently have ${posts.length} posts. unshifting new one...`);
     
     const newPost: Post = {
       ...post,
@@ -21,33 +33,35 @@ export async function savePost(post: Omit<Post, 'id' | 'publishedAt' | 'slug'>) 
     };
 
     posts.unshift(newPost);
-
-    if (!fs.existsSync(DATA_DIR)) {
-      console.log(`[STORAGE] Creating directory: ${DATA_DIR}`);
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    
+    if (redis) {
+      console.log(`[STORAGE] Saving to Redis: ${POSTS_KEY}`);
+      await redis.set(POSTS_KEY, JSON.stringify(posts));
+    } else {
+      console.log(`[STORAGE] Saving to FS: ${POSTS_FILE}`);
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2));
     }
-
-    fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2));
-    console.log(`[STORAGE] ✅ Successfully wrote to ${POSTS_FILE}. Total posts: ${posts.length}`);
+    
+    console.log(`[STORAGE] ✅ Successfully saved post. Total posts: ${posts.length}`);
     return newPost;
   } catch (error: any) {
-    console.error(`[STORAGE ERROR] Failed to save post: ${error.message}`);
+    console.error(`[STORAGE ERROR] Failed to save post:`, error);
     throw error;
   }
 }
 
 export async function getPosts(): Promise<Post[]> {
   try {
-    if (!fs.existsSync(POSTS_FILE)) {
-      console.log(`[STORAGE] ${POSTS_FILE} not found. Returning empty array.`);
-      return [];
+    if (redis) {
+      const data = await redis.get(POSTS_KEY);
+      return data ? JSON.parse(data) : [];
+    } else {
+      if (!fs.existsSync(POSTS_FILE)) return [];
+      return JSON.parse(fs.readFileSync(POSTS_FILE, 'utf-8'));
     }
-    const data = fs.readFileSync(POSTS_FILE, 'utf-8');
-    const parsed = JSON.parse(data);
-    console.log(`[STORAGE] Read ${parsed.length} posts from ${POSTS_FILE}`);
-    return parsed;
   } catch (error: any) {
-    console.error(`[STORAGE ERROR] Failed to read posts: ${error.message}`);
+    console.error(`[STORAGE ERROR] Failed to read posts:`, error);
     return [];
   }
 }
@@ -64,23 +78,24 @@ export async function updatePost(id: string, updates: Partial<Post>) {
   
   posts[index] = { ...posts[index], ...updates };
   
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (redis) {
+    await redis.set(POSTS_KEY, JSON.stringify(posts));
+  } else {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2));
   }
-
-  fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2));
   return posts[index];
 }
 
-const SETTINGS_FILE = path.resolve(DATA_DIR, 'settings.json');
-
 async function getAllSettings(): Promise<Record<string, any>> {
-  if (!fs.existsSync(SETTINGS_FILE)) {
-    return {};
-  }
   try {
-    const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-    return JSON.parse(data);
+    if (redis) {
+      const data = await redis.get(SETTINGS_KEY);
+      return data ? JSON.parse(data) : {};
+    } else {
+      if (!fs.existsSync(SETTINGS_FILE)) return {};
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    }
   } catch {
     return {};
   }
@@ -91,11 +106,12 @@ export async function saveSettings(key: string, value: any) {
     const settings = await getAllSettings();
     settings[key] = value;
     
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (redis) {
+      await redis.set(SETTINGS_KEY, JSON.stringify(settings));
+    } else {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
     }
-    
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
     return true;
   } catch (error) {
     console.error(`[STORAGE ERROR] Failed to save settings: ${key}`, error);

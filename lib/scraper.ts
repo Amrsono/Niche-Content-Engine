@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 export async function fetchGoogleTrends() {
   console.log('[SCRAPER] Fetching Google Trends RSS...');
   try {
-    const response = await axios.get('https://trends.google.com/trends/trendingsearches/daily/rss?geo=US');
+    const response = await axios.get('https://trends.google.com/trending/rss?geo=US');
     const parser = new XMLParser();
     const jsonObj = parser.parse(response.data);
     

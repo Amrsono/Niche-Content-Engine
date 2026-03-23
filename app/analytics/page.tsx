@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FloatingNav } from '../components/FloatingNav';
 import { BentoBox } from '../components/BentoBox';
 import { 
@@ -23,6 +23,33 @@ const metrics = [
 ];
 
 export default function AnalyticsPage() {
+  const [targetNiches, setTargetNiches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTrends() {
+      try {
+        const res = await fetch('/api/trends');
+        const data = await res.json();
+        if (data.success && data.trends) {
+          // Take top 6 trending keywords
+          setTargetNiches(data.trends.slice(0, 6));
+        }
+      } catch (err) {
+        console.error("Failed to fetch trends", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    // Fetch initially
+    fetchTrends();
+    
+    // Refresh frequently (every 1 minute)
+    const interval = setInterval(fetchTrends, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <main className={styles.main}>
       <FloatingNav />
@@ -82,20 +109,26 @@ export default function AnalyticsPage() {
         </BentoBox>
 
         <BentoBox className={styles.nicheList} delay={0.5}>
-          <h3>Target Niches</h3>
+          <h3>Live Trending Niches</h3>
           <div className={styles.nicheTable}>
-            {['Sustainable Tech', 'AI Tools', 'Pet Wellness', 'FinOps'].map((niche, i) => (
-              <div key={i} className={styles.nicheRow}>
-                <div className={styles.nicheInfo}>
-                  <Globe size={16} color="var(--accent-1)" />
-                  <span>{niche}</span>
+            {loading ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Refreshing Feed...</div>
+            ) : targetNiches.length > 0 ? (
+              targetNiches.map((niche, i) => (
+                <div key={i} className={styles.nicheRow}>
+                  <div className={styles.nicheInfo}>
+                    <Globe size={16} color="var(--accent-1)" />
+                    <span style={{ textTransform: 'capitalize' }}>{niche.keyword}</span>
+                  </div>
+                  <div className={styles.nicheStatus}>
+                    <div className={styles.statusDot} style={{ backgroundColor: niche.type === 'TikTok' ? '#ff0050' : '#00ff00' }} />
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{niche.type}</span>
+                  </div>
                 </div>
-                <div className={styles.nicheStatus}>
-                  <div className={styles.statusDot} />
-                  Active
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>No trends available</div>
+            )}
           </div>
         </BentoBox>
       </div>

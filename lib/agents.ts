@@ -387,17 +387,17 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
   }
 }
 
-// 3. SEO Auto-Optimizer (DALL-E 3 / Imagen)
+// 3. SEO Auto-Optimizer (DALL-E 3 / Imagen / Pollinations)
 export async function generateOgImage(title: string): Promise<string> {
   console.log(`[SEO] Generating AI Image for: ${title}`);
   
   try {
-    // A. Generate a high-quality prompt with Fallback
+    // A. Generate a high-quality, catchy, clickbait prompt using Groq
     const promptCompletion = await callGroq({
       messages: [
         {
           role: "user",
-          content: `Write a 1-sentence prompt for DALL-E 3 to create a hyper-minimalist, sleek, dark-mode 2026 tech aesthetic background for this title: "${title}". Return JSON with 'prompt'.`
+          content: `Write a highly detailed, 1-sentence image generation prompt for DALL-E 3 to create an incredibly catchy, vibrant, clickbait-style YouTube thumbnail for an article titled: "${title}". Make it look highly relevant, futuristic, and premium with high contrast (like neon edges on dark backgrounds) and hyper-realistic 3D elements to guarantee extremely high click-through rates. Do not include text in the image. Return JSON with 'prompt'.`
         }
       ],
       model: DISCOVERY_MODEL,
@@ -406,28 +406,44 @@ export async function generateOgImage(title: string): Promise<string> {
     
     const content = promptCompletion.choices[0].message.content || "{}";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || title;
+    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || `A highly engaging, realistic and futuristic 3D conceptual art piece representing: ${title}`;
 
-    // B. Check for API Keys (DALL-E 3 or Imagen)
+    // B. Check for API Keys (DALL-E 3)
     const openaiKey = process.env.OPENAI_API_KEY;
-    const vertexProjectId = process.env.VERTEX_PROJECT_ID;
 
     if (openaiKey) {
-      console.log(`[SEO] Calling DALL-E 3 API (Simulated)...`);
-      return `https://images.unsplash.com/photo-1677442136019-21780ecad995?fm=jpg&w=1200&h=630&fit=crop`; 
+      console.log(`[SEO] Calling DALL-E 3 API (Real)...`);
+      const { openai } = getAI();
+      const image = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: imagePrompt,
+        n: 1,
+        size: "1024x1024",
+      });
+      if (image.data && image.data[0] && image.data[0].url) {
+         console.log(`[SEO] DALL-E 3 Image Generation Successful!`);
+         return image.data[0].url;
+      }
     }
 
-    if (vertexProjectId) {
-      console.log(`[SEO] Calling Google Imagen API (Simulated)...`);
-      return `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?fm=jpg&w=1200&h=630&fit=crop`;
+    // C. Fallback to free AI Image generation (Pollinations) if DALL-E limit hit or no keys
+    console.log(`[SEO] DALL-E skipped or failed. Falling back to free AI Image Generator...`);
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true`;
+    
+    try {
+      console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
+      // This forces the image to generate now. When Instagram scrapes it later, it returns instantly.
+      await fetch(fallbackUrl);
+    } catch (e) {
+      console.warn(`[SEO] Warmup fetch failed, continuing anyway.`);
     }
 
-    // C. Fallback to high-quality Unsplash if no keys
-    console.log(`[SEO] No AI keys found. Falling back to Unsplash.`);
-    return `https://images.unsplash.com/photo-1518770660439-4636190af475?fm=jpg&w=1200&h=630&fit=crop&q=80`;
-  } catch (err) {
-    console.warn(`[SEO ERROR] Image generation failed:`, err);
-    return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200&h=630";
+    return fallbackUrl;
+  } catch (err: any) {
+    console.warn(`[SEO ERROR] Image generation failed:`, err.message || err);
+    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}?width=1200&height=630&nologo=true`;
+    try { await fetch(errorFallback); } catch (e) {}
+    return errorFallback;
   }
 }
 
@@ -756,13 +772,15 @@ export async function publishToTikTok(article: DraftArticle, blogUrl?: string): 
     });
 
     const data = await res.json();
-    if (!res.ok) {
+    
+    // TikTok sometimes returns 200 OK but includes an error payload
+    if (!res.ok || data.error || !data.data?.publish_id) {
        console.error('[TIKTOK ERROR]', JSON.stringify(data, null, 2));
-       throw new Error(data.error?.message || `TikTok API error (${res.status})`);
+       throw new Error((data.error?.message) || `TikTok API Error: Publish ID missing or invalid request.`);
     }
 
     // TikTok posting is asynchronous, return the publish_id
-    const publishId = data.data?.publish_id;
+    const publishId = data.data.publish_id;
     console.log(`[SOCIAL] ✅ TikTok Pulse Initiated: ${publishId}`);
 
     return { 
