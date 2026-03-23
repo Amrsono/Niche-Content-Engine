@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getPostBySlug, updatePost } from '@/lib/storage';
 import { publishToInstagram, publishToTwitter, publishToTikTok } from '@/lib/agents';
 import type { Post } from '@/lib/types';
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { postId, platform, slug } = await request.json();
     const origin = request.headers.get('origin') || `http://${request.headers.get('host')}` || 'http://localhost:3000';
