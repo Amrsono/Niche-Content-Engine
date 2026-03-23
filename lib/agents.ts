@@ -17,6 +17,21 @@ function stringifyError(err: any): string {
   }
 }
 
+/**
+ * Safely parses JSON from AI responses that might contain markdown or text noise.
+ */
+function safeJsonParse(content: string, context: string): any {
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const cleanContent = jsonMatch ? jsonMatch[0] : content;
+    return JSON.parse(cleanContent);
+  } catch (err) {
+    console.error(`[AI JSON ERROR] Failed to parse ${context}.`);
+    console.error(`[RAW CONTENT SNIPPET]: ${content.substring(0, 200)}...`);
+    throw new Error(`Invalid JSON response from AI while processing ${context}.`);
+  }
+}
+
 async function getTikTokToken() {
   const auth = await getSettings('tiktok_auth');
   if (!auth) return null;
@@ -258,8 +273,7 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
     });
 
     const content = chatCompletion.choices[0].message.content || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    const data = safeJsonParse(content, 'Trend Scraper');
     return (data.trends || []).map((t: any) => ({ ...t, niche }));
   } catch (err: any) {
     console.error("[DISCOVERY ERROR]", err);
@@ -307,8 +321,8 @@ async function generateOutline(keyword: string) {
     });
     
     const content = chatCompletion.choices[0].message.content || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : content).sections || [];
+    const data = safeJsonParse(content, 'Article Outline');
+    return data.sections || [];
   } catch (err: any) {
     console.error("[OUTLINE ERROR]", err);
     throw new Error(`Outline generation failed: ${stringifyError(err)}`);
@@ -424,8 +438,8 @@ export async function generateOgImage(title: string, context?: string): Promise<
     });
     
     const content = promptCompletion.choices[0].message.content || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
+    const data = safeJsonParse(content, 'Image Prompt');
+    const imagePrompt = data.prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
 
     // B. Check for API Keys (DALL-E 3)
     const openaiKey = process.env.OPENAI_API_KEY;
