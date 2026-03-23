@@ -32,6 +32,17 @@ function safeJsonParse(content: string, context: string): any {
   }
 }
 
+/**
+ * Strips markdown code blocks and extraneous whitespace from AI text responses.
+ */
+function cleanResult(content: string): string {
+  if (!content) return "";
+  return content
+    .replace(/^```[a-z]*\n/gi, "")
+    .replace(/```$/g, "")
+    .trim();
+}
+
 async function getTikTokToken() {
   const auth = await getSettings('tiktok_auth');
   if (!auth) return null;
@@ -350,7 +361,7 @@ async function generateSection(title: string, keyword: string, productContext: s
     ],
     model: REASONING_MODEL
   });
-  return chatCompletion.choices[0].message.content || "";
+  return cleanResult(chatCompletion.choices[0].message.content || "");
 }
 
 // 2. Reasoning Agent (Multi-Pass Coordinator)
@@ -393,7 +404,7 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
     return {
       title: `${keyword}: The 2026 Definitive Deep-Dive`,
       content: fullContent,
-      metaDescription: metaCompletion.choices[0].message.content || ""
+      metaDescription: cleanResult(metaCompletion.choices[0].message.content || "").replace(/^["']|["']$/g, "")
     };
   } catch (err: any) {
     console.error("[REASONING ERROR]", err);
