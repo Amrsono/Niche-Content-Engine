@@ -17,6 +17,10 @@ export default function BlogPage() {
   const router = useRouter();
   const { isSignedIn } = useUser();
   const [signaling, setSignaling] = useState<Record<string, boolean>>({});
+  
+  // Filtering state
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
     const handleUpdate = () => refresh();
@@ -45,6 +49,40 @@ export default function BlogPage() {
     }
   };
 
+  // Derived data
+  const categories = ['all', ...Array.from(new Set(posts.map(p => p.category || 'General').filter(Boolean)))];
+
+  const filteredPosts = posts.filter(post => {
+    // 1. Time Filter
+    if (timeFilter !== 'all') {
+      const postDate = new Date(post.publishedAt);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      if (timeFilter === 'today') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (postDate < today) return false;
+      } else if (timeFilter === 'week') {
+        const lastWeek = new Date();
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        if (postDate < lastWeek) return false;
+      } else if (timeFilter === 'month') {
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        if (postDate < lastMonth) return false;
+      }
+    }
+
+    // 2. Category Filter
+    if (categoryFilter !== 'all') {
+      const cat = post.category || 'General';
+      if (cat !== categoryFilter) return false;
+    }
+
+    return true;
+  });
+
   return (
     <main className={styles.blogContainer}>
       <FloatingNav />
@@ -60,16 +98,49 @@ export default function BlogPage() {
           )}
         </header>
 
-        {/* Display ad below blog header */}
+        {/* Filter Controls */}
+        <div className={styles.filterSection}>
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Time Range</span>
+            <div className={styles.filterOptions}>
+              {['all', 'today', 'week', 'month'].map(t => (
+                <button 
+                  key={t}
+                  onClick={() => setTimeFilter(t as any)}
+                  className={`${styles.filterTab} ${timeFilter === t ? styles.active : ''}`}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Category</span>
+            <div className={styles.filterOptions}>
+              {categories.map(c => (
+                <button 
+                  key={c}
+                  onClick={() => setCategoryFilter(c)}
+                  className={`${styles.filterTab} ${categoryFilter === c ? styles.active : ''}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Display ad below filters */}
         <AdSenseDisplay />
 
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
-            <p>No pulses generated yet. Start a cycle in the main dashboard!</p>
+            <p>{posts.length === 0 ? "No pulses generated yet." : "No pulses match your filters."}</p>
           </div>
         ) : (
           <div className={styles.postGrid}>
-             {posts.map((post: Post) => (
+             {filteredPosts.map((post: Post) => (
                 <article 
                   className={styles.postCard} 
                   key={post.id} 
@@ -86,7 +157,10 @@ export default function BlogPage() {
                     />
                   </div>
                   <div className={styles.cardContent}>
-                    <span className={styles.tag}>{post.keyword}</span>
+                    <div className={styles.cardHeader}>
+                      <span className={styles.tag}>{post.keyword}</span>
+                      {post.category && <span className={styles.categoryTag}>{post.category}</span>}
+                    </div>
                     <h2 className={styles.postTitle}>{post.title}</h2>
                     <p className={styles.excerpt}>{post.metaDescription}</p>
                     <div className={styles.cardFooter}>
@@ -157,7 +231,7 @@ export default function BlogPage() {
         )}
 
         {/* Display ad below posts grid */}
-        {posts.length > 0 && <AdSenseDisplay />}
+        {filteredPosts.length > 0 && <AdSenseDisplay />}
       </div>
     </main>
   );

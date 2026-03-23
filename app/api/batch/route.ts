@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         article.ogImageUrl = ogImageUrl;
         
         // Publish (Local Pulse Blog)
-        const publishResult: PublishResult = await publishToLocal(article, trend.keyword);
+        const publishResult: PublishResult = await publishToLocal(article, trend.keyword, trend.niche || niche);
         
         // Social Signal - Instagram, X/Twitter & TikTok
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';

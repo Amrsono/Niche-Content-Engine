@@ -469,7 +469,7 @@ export async function generateOgImage(title: string, context?: string): Promise<
 
 
 // 4. Auto-Publisher (WordPress / Sanity / Local)
-export async function publishToLocal(article: DraftArticle, keyword: string): Promise<PublishResult> {
+export async function publishToLocal(article: DraftArticle, keyword: string, category?: string): Promise<PublishResult> {
   console.log(`[PUBLISHER] Attempting to save '${article.title}' to local storage...`);
   try {
     const post = await savePost({
@@ -478,7 +478,8 @@ export async function publishToLocal(article: DraftArticle, keyword: string): Pr
       metaDescription: article.metaDescription,
       ogImageUrl: article.ogImageUrl,
       status: 'published',
-      keyword: keyword
+      keyword: keyword,
+      category: category
     });
     
     console.log(`[PUBLISHER] ✅ Saved successfully as ID: ${post.id}. Slug: ${post.slug}`);

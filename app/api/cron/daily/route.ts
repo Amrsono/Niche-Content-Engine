@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     const article = await generateArticle(keyword);
     article.ogImageUrl = await generateOgImage(article.title, keyword);
 
-    const publishResult = await publishToLocal(article, keyword);
+    const publishResult = await publishToLocal(article, keyword, keyword);
     
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
     const absoluteUrl = `${siteUrl}${publishResult.url}`;

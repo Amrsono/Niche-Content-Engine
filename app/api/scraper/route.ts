@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     } else if (cmsProvider === 'sanity') {
       publishResult = await publishToSanity(draft);
     } else {
-      publishResult = await publishToLocal(draft, targetKeyword);
+      publishResult = await publishToLocal(draft, targetKeyword, niche || 'General');
     }
     
     // 5. Social Media Phase (Pulse across Instagram/X/TikTok)

@@ -7,6 +7,7 @@ export interface Post {
   publishedAt: string;
   slug: string;
   keyword: string;
+  category?: string;
   status: 'published' | 'scheduled' | 'draft' | string;
   instagramUrl?: string;
   twitterUrl?: string;
