@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     console.log(`[CRON DAILY] Selected topic: ${keyword}`);
 
     const article = await generateArticle(keyword);
-    article.ogImageUrl = await generateOgImage(article.title);
+    article.ogImageUrl = await generateOgImage(article.title, keyword);
 
     const publishResult = await publishToLocal(article, keyword);
     

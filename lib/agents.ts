@@ -388,16 +388,35 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
 }
 
 // 3. SEO Auto-Optimizer (DALL-E 3 / Imagen / Pollinations)
-export async function generateOgImage(title: string): Promise<string> {
+export async function generateOgImage(title: string, context?: string): Promise<string> {
   console.log(`[SEO] Generating AI Image for: ${title}`);
   
   try {
-    // A. Generate a high-quality, catchy, clickbait prompt using Groq
+    const visualVibes = [
+      "Cyberpunk Neon: High contrast, dark backgrounds with vibrant neon edges, futuristic tech elements, cinematic lighting.",
+      "Minimalist Swiss: Clean lines, bold typography, monochromatic with one accent color, premium editorial feel.",
+      "Vibrant 3D Pop: Hyper-realistic 3D rendering, claymorphism, playful colors, soft shadows, studio lighting.",
+      "Abstract Organic: Flowing shapes, natural gradients, soft textures, peaceful and premium aesthetic.",
+      "Tech-Noir Investigative: Gritty, moody, dark atmosphere, blue/teal color palette, high-tech interface elements.",
+      "Hyper-Realistic Macro: Extreme close-up of high-tech materials, glass, metal, and light reflections."
+    ];
+    
+    const selectedVibe = visualVibes[Math.floor(Math.random() * visualVibes.length)];
+    const contextInfo = context ? `Article Context: ${context}` : "";
+
+    // A. Generate a high-quality, catchy prompt using Groq
     const promptCompletion = await callGroq({
       messages: [
         {
+          role: "system",
+          content: `You are an expert AI prompt engineer. Your goal is to write a highly detailed, 1-sentence image generation prompt that creates a PREMIUM, attention-grabbing, and HIGH-RELEVANCE image for an article. 
+          Use the provided title and context to ensure the image directly relates to the topic. 
+          Follow the specific visual style/vibe provided. 
+          Avoid generic results. Do not include any text, letters, or words in the image.`
+        },
+        {
           role: "user",
-          content: `Write a highly detailed, 1-sentence image generation prompt for DALL-E 3 to create an incredibly catchy, vibrant, clickbait-style YouTube thumbnail for an article titled: "${title}". Make it look highly relevant, futuristic, and premium with high contrast (like neon edges on dark backgrounds) and hyper-realistic 3D elements to guarantee extremely high click-through rates. Do not include text in the image. Return JSON with 'prompt'.`
+          content: `Topic: "${title}". ${contextInfo}\nVisual Style Vibe: ${selectedVibe}\n\nTask: Generate a detailed 1-sentence DALL-E 3 prompt. Return JSON with 'prompt'.`
         }
       ],
       model: DISCOVERY_MODEL,
@@ -406,7 +425,7 @@ export async function generateOgImage(title: string): Promise<string> {
     
     const content = promptCompletion.choices[0].message.content || "{}";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || `A highly engaging, realistic and futuristic 3D conceptual art piece representing: ${title}`;
+    const imagePrompt = JSON.parse(jsonMatch ? jsonMatch[0] : content).prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
 
     // B. Check for API Keys (DALL-E 3)
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -427,8 +446,9 @@ export async function generateOgImage(title: string): Promise<string> {
     }
 
     // C. Fallback to free AI Image generation (Pollinations) if DALL-E limit hit or no keys
-    console.log(`[SEO] DALL-E skipped or failed. Falling back to free AI Image Generator...`);
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true`;
+    const randomSeed = Math.floor(Math.random() * 100000);
+    console.log(`[SEO] DALL-E skipped or failed. Falling back to Pollinations with seed: ${randomSeed}`);
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${randomSeed}`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);

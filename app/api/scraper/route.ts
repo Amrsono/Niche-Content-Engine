@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const draft = await generateArticle(targetKeyword);
     
     // 3. SEO Auto-Optimization Phase (DALL-E 3 / Meta)
-    const ogImageUrl = await generateOgImage(draft.title);
+    const ogImageUrl = await generateOgImage(draft.title, targetKeyword);
     draft.ogImageUrl = ogImageUrl;
     
     // 4. Auto-Publisher Phase (Local by default, or WordPress/Sanity)

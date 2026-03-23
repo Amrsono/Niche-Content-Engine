@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         const article = await generateArticle(trend.keyword);
         
         // Generate Image (Static placeholder for now as per agents.ts)
-        const ogImageUrl = await generateOgImage(article.title);
+        const ogImageUrl = await generateOgImage(article.title, trend.keyword || niche);
         article.ogImageUrl = ogImageUrl;
         
         // Publish (Local Pulse Blog)
