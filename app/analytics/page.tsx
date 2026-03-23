@@ -25,6 +25,16 @@ const metrics = [
 export default function AnalyticsPage() {
   const [targetNiches, setTargetNiches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('24h');
+
+  // Realistic mock data for different time ranges
+  const chartDataSets: Record<string, number[]> = {
+    '24h': [60, 45, 80, 55, 90, 70, 100, 85, 60, 40, 75, 95],
+    '7d': [40, 70, 50, 85, 30, 95, 65, 80, 45, 70, 55, 90],
+    '30d': [30, 55, 40, 60, 75, 50, 80, 70, 95, 85, 100, 90]
+  };
+
+  const currentData = chartDataSets[activeTab];
 
   useEffect(() => {
     async function fetchTrends() {
@@ -87,21 +97,27 @@ export default function AnalyticsPage() {
           <div className={styles.chartHeader}>
             <h3>Traffic Distribution</h3>
             <div className={styles.chartTabs}>
-              <button className={styles.activeTab}>24h</button>
-              <button>7d</button>
-              <button>30d</button>
+              {['24h', '7d', '30d'].map((tab) => (
+                <button 
+                  key={tab}
+                  className={activeTab === tab ? styles.activeTab : ''}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
           <div className={styles.chartBody}>
             {/* Visual Chart Placeholder */}
             <div className={styles.barChart}>
-              {[60, 45, 80, 55, 90, 70, 100, 85, 60, 40, 75, 95].map((h, i) => (
+              {currentData.map((h, i) => (
                 <motion.div 
-                  key={i}
+                  key={`${activeTab}-${i}`}
                   className={styles.bar}
                   initial={{ height: 0 }}
                   animate={{ height: `${h}%` }}
-                  transition={{ delay: 0.5 + i * 0.05, type: 'spring', stiffness: 100 }}
+                  transition={{ delay: i * 0.05, type: 'spring', stiffness: 100 }}
                 />
               ))}
             </div>

@@ -106,11 +106,10 @@ function getAI() {
 }
 
 // Models
-// Models
 const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
 const REASONING_MODEL = "llama-3.3-70b-versatile";
 const FAST_MODEL = "llama-3.1-8b-instant"; // For small tasks
-const FALLBACK_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-2.0-flash";
 
 // Global Provider Cooldowns
 const providerCooldowns: Record<string, number> = {
@@ -437,7 +436,8 @@ export async function generateOgImage(title: string, context?: string): Promise<
           content: `You are an expert AI prompt engineer. Your goal is to write a highly detailed, 1-sentence image generation prompt that creates a PREMIUM, attention-grabbing, and HIGH-RELEVANCE image for an article. 
           Use the provided title and context to ensure the image directly relates to the topic. 
           Follow the specific visual style/vibe provided. 
-          Avoid generic results. Do not include any text, letters, or words in the image.`
+          Avoid generic results. Do not include any text, letters, or words in the image.
+          CRITICAL: Return ONLY a descriptive text prompt. NEVER return a URL, link, or image path.`
         },
         {
           role: "user",
@@ -450,7 +450,13 @@ export async function generateOgImage(title: string, context?: string): Promise<
     
     const content = promptCompletion.choices[0].message.content || "{}";
     const data = safeJsonParse(content, 'Image Prompt');
-    const imagePrompt = data.prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
+    let imagePrompt = data.prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
+
+    // Safety Check: If the AI returned a URL instead of a prompt, discard it
+    if (imagePrompt.startsWith('http') || imagePrompt.includes('unsplash.com') || imagePrompt.includes('rebrand.ly')) {
+      console.warn(`[SEO] AI returned a URL as a prompt! Discarding and using title-based prompt.`);
+      imagePrompt = `A premium and high-fidelity 3D digital art piece representing: ${title}. High-tech aesthetic, cinematic lighting.`;
+    }
 
     // B. Check for API Keys (DALL-E 3)
     const openaiKey = process.env.OPENAI_API_KEY;
