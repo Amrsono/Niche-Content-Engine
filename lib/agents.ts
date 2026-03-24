@@ -600,12 +600,23 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
     
     caption += `\n\n${hashtags}`;
     
+    // Normalize image URL: Instagram requires the URL to resolve to a JPEG.
+    // Pollinations URLs need a .jpg extension before the query string.
+    let imageUrl = article.ogImageUrl || '';
+    if (imageUrl.includes('image.pollinations.ai') && !imageUrl.includes('.jpg?') && !imageUrl.endsWith('.jpg')) {
+      // Insert .jpg before the query string if present, or append it
+      imageUrl = imageUrl.includes('?')
+        ? imageUrl.replace('?', '.jpg?')
+        : imageUrl + '.jpg';
+    }
+    console.log(`[INSTAGRAM] Using image URL: ${imageUrl}`);
+
     // Move access_token to Query String for maximum reliability
     const containerRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image_url: article.ogImageUrl,
+        image_url: imageUrl,
         caption: caption,
       }),
     });
