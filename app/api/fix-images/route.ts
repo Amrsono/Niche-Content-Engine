@@ -14,6 +14,8 @@ function isBrokenImage(url: string | undefined): boolean {
   if (url.includes('unsplash.com')) return true;
   // Previously we used image.pollinations.ai/prompt/ but this was deprecated and returns 404 ORB blocks
   if (url.includes('image.pollinations.ai')) return true;
+  // Encoded quotes in the prompt cause 401/404 on current gen.pollinations.ai
+  if (url.includes('%22')) return true;
   return false;
 }
 

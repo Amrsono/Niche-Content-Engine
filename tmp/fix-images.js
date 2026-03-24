@@ -20,6 +20,7 @@ function isBrokenImage(url) {
   if (url.includes('rebrand.ly')) return true;
   if (url.includes('unsplash.com')) return true;
   if (url.includes('image.pollinations.ai')) return true;
+  if (url.includes('%22')) return true;
   return false;
 }
 
@@ -57,6 +58,9 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     });
 
     let prompt = (completion.choices[0]?.message?.content || '').trim();
+    // Strip leading/trailing double quotes
+    prompt = prompt.replace(/^"+|"+$/g, '');
+    
     // Safety: if AI returned a URL, fall back to title-based prompt
     if (prompt.startsWith('http') || prompt.includes('unsplash') || prompt.includes('rebrand')) {
       prompt = `A cinematic, ultra-detailed editorial concept art representing: ${title}. Dramatic lighting, deep colors, high contrast, premium magazine quality.`;
@@ -73,7 +77,8 @@ function buildPollinationsUrl(prompt, title) {
   const titleSeed = title.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 999983;
   const randomBoost = Math.floor(Math.random() * 10000);
   const seed = titleSeed + randomBoost;
-  return `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}&enhance=true&model=flux`;
+  const pollKey = process.env.POLLINATIONS_API_KEY || 'pk_31oNBvU9JLA1ApNX';
+  return `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}&enhance=true&model=flux&key=${pollKey}`;
 }
 
 const delay = ms => new Promise(r => setTimeout(r, ms));

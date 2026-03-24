@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import SidebarAd from '../components/SidebarAd';
 import adStyles from '../components/AdStyles.module.css';
 
-const FALLBACK_IMG = 'https://gen.pollinations.ai/image/sleek%20futuristic%20abstract%20technology%20concept%2C%20premium%20dark%20editorial%20style%2C%20glassmorphism%2C%20neon%20accents%2C%20no%20text?width=800&height=420&nologo=true&seed=42&model=flux';
+const FALLBACK_IMG = 'https://gen.pollinations.ai/image/sleek%20futuristic%20abstract%20technology%20concept%2C%20premium%20dark%20editorial%20style%2C%20glassmorphism%2C%20neon%20accents%2C%20no%20text?width=800&height=420&nologo=true&seed=42&model=flux&key=pk_31oNBvU9JLA1ApNX';
 
 export default function BlogPage() {
   const { posts, refresh } = usePosts();

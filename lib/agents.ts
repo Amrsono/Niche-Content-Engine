@@ -40,7 +40,8 @@ function cleanResult(content: string): string {
   return content
     .replace(/^```[a-z]*\n/gi, "")
     .replace(/```$/g, "")
-    .trim();
+    .trim()
+    .replace(/^"+|"+$/g, ""); // Strip leading/trailing double quotes
 }
 
 async function getTikTokToken() {
@@ -508,8 +509,12 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     const randomBoost = Math.floor(Math.random() * 10000);
     const uniqueSeed = titleSeed + randomBoost;
     console.log(`[SEO] Falling back to Pollinations. Unique seed: ${uniqueSeed}`);
+    
+    // Use a default public key if one isn't provided in the environment
+    const pollKey = process.env.POLLINATIONS_API_KEY || 'pk_31oNBvU9JLA1ApNX';
+    
     // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
-    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux`;
+    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux&key=${pollKey}`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
