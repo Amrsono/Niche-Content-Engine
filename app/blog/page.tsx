@@ -90,7 +90,11 @@ export default function BlogPage() {
       <FloatingNav />
       
       <div className={adStyles.blogLayoutWrapper}>
-        <SidebarAd />
+        <SidebarAd 
+          link="https://amzn.to/41mSxQD"
+          label="Today's Deals"
+          image="/ads/amazon_deals_ad_sidebar.png"
+        />
 
         <div className={adStyles.mainColumn}>
           <div className={styles.blogContent}>
