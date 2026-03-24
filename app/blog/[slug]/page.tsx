@@ -118,7 +118,10 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
         </div>
 
         {/* Right Sidebar Ad */}
-        <SidebarAd />
+        <SidebarAd 
+          link="https://amzn.to/4bZ6kmB"
+          label="Hot New Releases"
+        />
       </div>
     </main>
   );
