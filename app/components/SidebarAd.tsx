@@ -7,17 +7,15 @@ interface SidebarAdProps {
   link?: string;
   label?: string;
   image?: string;
-  hideOnMobile?: boolean;
 }
 
 export default function SidebarAd({ 
   link, 
   label = "Advertisement", 
-  image, 
-  hideOnMobile = true 
+  image
 }: SidebarAdProps) {
   return (
-    <div className={`${styles.sidebarColumn} ${hideOnMobile ? styles.hideOnMobile : ''}`}>
+    <div className={styles.sidebarColumn}>
       <div className={styles.sidebarAd}>
         <div className={styles.sidebarAdLabel}>{label}</div>
         
@@ -26,7 +24,7 @@ export default function SidebarAd({
             href={link} 
             target="_blank" 
             rel="noopener noreferrer" 
-            style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            className={styles.sidebarAdLink}
           >
             {image ? (
               <div style={{ position: 'relative', width: '140px', height: '280px', marginBottom: '15px' }}>
