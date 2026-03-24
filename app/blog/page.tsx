@@ -245,7 +245,11 @@ export default function BlogPage() {
           </div>
         </div>
 
-        <SidebarAd />
+        <SidebarAd 
+          link="https://amzn.to/4bROoJA"
+          label="Flash Sale"
+          image="/ads/amazon_flash_sale_ad_sidebar.png"
+        />
       </div>
     </main>
   );
