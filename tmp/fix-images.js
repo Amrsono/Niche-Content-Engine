@@ -19,6 +19,7 @@ function isBrokenImage(url) {
   if (!url) return true;
   if (url.includes('rebrand.ly')) return true;
   if (url.includes('unsplash.com')) return true;
+  if (url.includes('image.pollinations.ai')) return true;
   return false;
 }
 
@@ -72,7 +73,7 @@ function buildPollinationsUrl(prompt, title) {
   const titleSeed = title.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 999983;
   const randomBoost = Math.floor(Math.random() * 10000);
   const seed = titleSeed + randomBoost;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}.jpg?width=1200&height=630&nologo=true&seed=${seed}&enhance=true`;
+  return `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}&enhance=true&model=flux`;
 }
 
 const delay = ms => new Promise(r => setTimeout(r, ms));

@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'rebrand.ly' },
       { protocol: 'https', hostname: 'image.pollinations.ai' },
+      { protocol: 'https', hostname: 'gen.pollinations.ai' },
     ],
   },
 };

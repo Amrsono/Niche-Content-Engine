@@ -509,7 +509,7 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     const uniqueSeed = titleSeed + randomBoost;
     console.log(`[SEO] Falling back to Pollinations. Unique seed: ${uniqueSeed}`);
     // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true`;
+    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
@@ -522,7 +522,7 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     return fallbackUrl;
   } catch (err: any) {
     console.warn(`[SEO ERROR] Image generation failed:`, err.message || err);
-    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}.jpg?width=1200&height=630&nologo=true`;
+    const errorFallback = `https://gen.pollinations.ai/image/${encodeURIComponent(title)}?width=1200&height=630&nologo=true&model=flux`;
     try { await fetch(errorFallback); } catch (e) {}
     return errorFallback;
   }
