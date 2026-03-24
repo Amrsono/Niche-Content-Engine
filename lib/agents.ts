@@ -443,32 +443,34 @@ export async function generateOgImage(title: string, context?: string): Promise<
   console.log(`[SEO] Generating AI Image for: ${title}`);
   
   try {
-    const visualVibes = [
-      "Premium Tech Editorial: High-fidelity product photography style, clean studio lighting, soft shadows, 8k resolution, elegant and sophisticated.",
-      "Futuristic Isometric 3D: Clean 3D isometric representation of the concept, claymorphism, soft gradients, professional and modern.",
-      "Minimalist Abstract: Sophisticated geometric shapes, premium textures (glass, brushed metal), monochromatic with deep blue or teal accents.",
-      "Macro High-Tech: Extreme close-up of premium materials relevant to the topic, cinematic depth of field, sharp focus, vibrant yet professional colors."
-    ];
-    
-    // Choose a vibe but prioritize a clean editorial look
-    const selectedVibe = visualVibes[Math.floor(Math.random() * visualVibes.length)];
-    const contextInfo = context ? `Core Concept Context: ${context}` : "";
+    const contextInfo = context ? `Core Concept: ${context}` : "";
 
-    // A. Generate a high-quality, catchy prompt using Groq
+    // A. Generate a click-inducing, hyper-specific image prompt using Groq
     const promptCompletion = await callGroq({
       messages: [
         {
           role: "system",
-          content: `You are a world-class visual designer and AI prompt engineer. 
-          Your goal is to write a single, highly-descriptive sentence for an AI image generator (DALL-E 3) that captures the ESSENCE of the article topic with total relevance. 
-          The image must look like it belongs in a premium tech magazine like Wired or The Verge.
-          Avoid all human faces. Avoid any text, logos, or letters. 
-          Focus on high-quality materials, lighting, and composition. 
-          CRITICAL: Return ONLY the description, no preamble.`
+          content: `You are a world-class creative director for a viral digital magazine.
+Your ONLY job is to write a single image prompt for an AI image generator that will produce a STUNNING, click-inducing thumbnail.
+
+Rules:
+- The image must be SO specific to this article topic that it could belong to NO other article.
+- It must feel like a premium magazine cover: cinematic lighting, dramatic composition, ultra-high detail.
+- Choose ONE of these styles that best fits the topic:
+  • CINEMATIC PRODUCT SHOT: dramatic studio lighting, dark background, single hero object bursting with energy
+  • EXPLOSIVE 3D CONCEPT: vivid isometric scene, deep colors, neon highlights, claymorphism
+  • MACRO HYPER-DETAIL: extreme close-up of the most visually striking element of the topic, bokeh, razor-sharp focus, saturated colors
+  • EDITORIAL COLLAGE: bold graphic art, geometric shapes, high-contrast colors, abstract representation of the concept
+- NO human faces. NO text, logos, letters, or watermarks.
+- MUST be visually jaw-dropping. A blog reader scrolling at speed MUST stop and click.
+- Return ONLY the image prompt sentence. Nothing else. No preamble.`
         },
         {
           role: "user",
-          content: `ARTICLE TITLE: "${title}"\n${contextInfo}\nVisual Style: ${selectedVibe}\n\nWrite a 1-sentence, hyper-specific image prompt that creates a visual that ONLY makes sense for THIS article and no other. Be as literal and concrete as possible about what should appear in the image.`
+          content: `ARTICLE TITLE: "${title}"
+${contextInfo}
+
+Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make it so compelling that someone who sees this image CANNOT resist clicking to read the article.`
         }
       ],
       model: DISCOVERY_MODEL

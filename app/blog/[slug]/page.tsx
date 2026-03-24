@@ -87,10 +87,16 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
             <div className={styles.featuredImageArea}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'} 
+                src={post.ogImageUrl || `https://image.pollinations.ai/prompt/${encodeURIComponent(post.title + ' digital art cinematic')}.jpg?width=1200&height=630&nologo=true&enhance=true`} 
                 alt={post.title}
                 style={{ width: '100%', height: 'auto', display: 'block' }}
-                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'; }}
+                onError={(e) => { 
+                  const target = e.target as HTMLImageElement;
+                  // Fallback: generate an alternative image from the title
+                  if (!target.src.includes('fallback=true')) {
+                    target.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(post.title)}.jpg?width=1200&height=630&nologo=true&seed=42&fallback=true`;
+                  }
+                }}
               />
             </div>
 
