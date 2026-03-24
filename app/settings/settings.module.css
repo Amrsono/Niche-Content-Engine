@@ -1,0 +1,161 @@
+.main {
+  min-height: 100vh;
+  padding-top: 120px;
+  padding-bottom: 60px;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.header h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin-bottom: 8px;
+}
+
+.header p {
+  color: var(--foreground);
+  opacity: 0.6;
+  font-size: 1.1rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionTitle {
+  font-size: 1.25rem !important;
+  letter-spacing: -0.02em !important;
+  opacity: 0.9;
+}
+
+.sectionSubtitle {
+  opacity: 0.5;
+  font-size: 0.9rem;
+  margin-top: -10px;
+}
+
+/* Theme Cards Grid */
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.themeCard {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: var(--glow-shadow);
+}
+
+.themeCard:hover {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+}
+
+.activeCard {
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 1.5px var(--accent-1), var(--glow-shadow);
+}
+
+/* Active glow border on top */
+.activeBorder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  opacity: 0.8;
+}
+
+/* Preview Mockup */
+.preview {
+  width: 100%;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.previewCard {
+  width: 100%;
+  height: 80px;
+  border-radius: 12px;
+  border: 1px solid;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.previewBar {
+  height: 5px;
+  width: 40%;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.previewLine {
+  height: 4px;
+  width: 100%;
+  border-radius: 4px;
+}
+
+/* Theme Info Row */
+.themeInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.themeIcon {
+  flex-shrink: 0;
+}
+
+.themeMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.themeName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.themeDesc {
+  font-size: 0.78rem;
+  color: var(--foreground);
+  opacity: 0.5;
+  line-height: 1.4;
+}
+
+.activeCheck {
+  flex-shrink: 0;
+}
+
+/* Unauthorized */
+.unauthorized {
+  text-align: center;
+  padding: 100px 24px;
+  opacity: 0.5;
+}

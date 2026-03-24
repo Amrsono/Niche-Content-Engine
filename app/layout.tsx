@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import Script from "next/script";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 
 const geistSans = Geist({
@@ -40,8 +41,10 @@ export default function RootLayout({
           />
         </head>
         <body>
-          {children}
-          <Analytics />
+          <ThemeProvider>
+            {children}
+            <Analytics />
+          </ThemeProvider>
         </body>
 
       </html>

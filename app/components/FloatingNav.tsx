@@ -31,7 +31,7 @@ export function FloatingNav() {
             <Link href="/analytics" className={styles.link}>Analytics</Link>
             <Link href="/history" className={styles.link} style={{ color: '#a78bfa' }}>History</Link>
             <Link href="/diagnostic" className={styles.link} style={{ color: 'var(--accent-1)' }}>Diagnostic</Link>
-            <Link href="#" className={styles.link}>Settings</Link>
+            <Link href="/settings" className={styles.link} style={{ color: 'var(--accent-3)' }}>Settings</Link>
           </>
         )}
       </div>
