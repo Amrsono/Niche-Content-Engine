@@ -63,7 +63,11 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
       
       <div className={adStyles.blogLayoutWrapper}>
         {/* Left Sidebar Ad */}
-        <SidebarAd />
+        <SidebarAd 
+          link="https://amzn.to/47myeq5"
+          label="Best Sellers"
+          image="/ads/amazon_bestsellers_ad_sidebar.png"
+        />
 
         {/* Main Content */}
         <div className={adStyles.mainColumn}>
