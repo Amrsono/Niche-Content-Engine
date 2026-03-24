@@ -133,3 +133,71 @@
     height: 140px;
   }
 }
+
+/* Sidebar Skyscraper Ads */
+.sidebarAd {
+  width: 160px;
+  min-height: 600px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+}
+
+.sidebarAdLabel {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.15);
+  text-transform: uppercase;
+}
+
+.placeholderIcon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 15px;
+  opacity: 0.2;
+}
+
+/* Blog Layout Grid */
+.blogLayoutWrapper {
+  display: grid;
+  grid-template-columns: 180px 1fr 180px;
+  gap: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.mainColumn {
+  min-width: 0;
+}
+
+.sidebarColumn {
+  padding-top: 160px;
+  position: sticky;
+  top: 0;
+  height: fit-content;
+}
+
+@media (max-width: 1280px) {
+  .blogLayoutWrapper {
+    grid-template-columns: 1fr;
+    max-width: 800px;
+  }
+  
+  .sidebarColumn {
+    display: none;
+  }
+}

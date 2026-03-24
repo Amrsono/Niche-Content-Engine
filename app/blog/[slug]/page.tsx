@@ -7,6 +7,7 @@ import { FloatingNav } from '@/app/components/FloatingNav';
 import AdSenseInArticle from '@/app/components/AdSenseInArticle';
 import AdSenseDisplay from '@/app/components/AdSenseDisplay';
 import AmazonAdBanner from '@/app/components/AmazonAdBanner';
+import SidebarAd from '@/app/components/SidebarAd';
 import { use, useEffect } from 'react';
 import { trackView } from '@/lib/analytics';
 
@@ -59,51 +60,61 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
     <main className={styles.blogContainer}>
       <FloatingNav />
       
-      <article className={styles.readerContainer}>
-        <header className={styles.readerHeader}>
-          <div className={styles.tag} style={{ fontSize: '1rem', marginBottom: '20px' }}>{post.keyword}</div>
-          <h1 className={styles.readerTitle}>{post.title}</h1>
-          <div className={styles.readerMeta}>
-            <span>{new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-            <span>•</span>
-            <span>2,000+ Words</span>
-            <span>•</span>
-            <span>Original Insight</span>
-          </div>
-        </header>
+      <div className={styles.blogLayoutWrapper}>
+        {/* Left Sidebar Ad */}
+        <SidebarAd />
 
-        <div className={styles.featuredImageArea}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'} 
-            alt={post.title}
-            style={{ width: '100%', height: 'auto', display: 'block' }}
-            onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'; }}
-          />
+        {/* Main Content */}
+        <div className={styles.mainColumn}>
+          <article className={styles.readerContainer}>
+            <header className={styles.readerHeader}>
+              <div className={styles.tag} style={{ fontSize: '1rem', marginBottom: '20px' }}>{post.keyword}</div>
+              <h1 className={styles.readerTitle}>{post.title}</h1>
+              <div className={styles.readerMeta}>
+                <span>{new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                <span>•</span>
+                <span>2,000+ Words</span>
+                <span>•</span>
+                <span>Original Insight</span>
+              </div>
+            </header>
+
+            <div className={styles.featuredImageArea}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={post.ogImageUrl || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'} 
+                alt={post.title}
+                style={{ width: '100%', height: 'auto', display: 'block' }}
+                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop'; }}
+              />
+            </div>
+
+            {/* First 2 paragraphs */}
+            <div 
+              className={styles.articleBody}
+              dangerouslySetInnerHTML={{ __html: contentBefore }}
+            />
+
+            {/* In-article ad — placed after 2nd paragraph as per Google's recommendation */}
+            <AdSenseInArticle />
+
+            {/* Rest of article */}
+            <div 
+              className={styles.articleBody}
+              dangerouslySetInnerHTML={{ __html: contentAfter }}
+            />
+
+            {/* Amazon Shopping Ad placeholder */}
+            <AmazonAdBanner />
+
+            {/* Display ad at the very bottom of each article */}
+            <AdSenseDisplay style={{ marginTop: '1rem' }} />
+          </article>
         </div>
 
-        {/* First 2 paragraphs */}
-        <div 
-          className={styles.articleBody}
-          dangerouslySetInnerHTML={{ __html: contentBefore }}
-        />
-
-        {/* In-article ad — placed after 2nd paragraph as per Google's recommendation */}
-        <AdSenseInArticle />
-
-        {/* Rest of article */}
-        <div 
-          className={styles.articleBody}
-          dangerouslySetInnerHTML={{ __html: contentAfter }}
-        />
-
-        {/* Amazon Shopping Ad placeholder */}
-        <AmazonAdBanner />
-
-        {/* Display ad at the very bottom of each article */}
-        <AdSenseDisplay style={{ marginTop: '1rem' }} />
-      </article>
+        {/* Right Sidebar Ad */}
+        <SidebarAd />
+      </div>
     </main>
   );
 }
-
