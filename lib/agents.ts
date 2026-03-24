@@ -394,16 +394,30 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
       await delay(8000); 
     }
 
-    // Generate Meta Description with Fallback
+    // Generate Title and Meta Description
     const metaCompletion = await callGroq({
-      messages: [{ role: "user", content: `Write a high-CTR SEO meta description for this article title: "${keyword}". Max 160 chars.` }],
-      model: DISCOVERY_MODEL
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert copywriter. Generate a highly clickable, premium article title and an SEO-optimized meta description. Return JSON with 'title' (string, max 60 chars) and 'metaDescription' (string, max 160 chars)."
+        },
+        { 
+          role: "user", 
+          content: `Topic: "${keyword}".` 
+        }
+      ],
+      model: DISCOVERY_MODEL,
+      response_format: { type: "json_object" }
     });
 
+    const metaData = safeJsonParse(metaCompletion.choices[0].message.content || "{}", 'Title and Meta Generation');
+    const dynamicTitle = metaData.title || `${keyword}: A Complete Guide`;
+    const dynamicMeta = metaData.metaDescription || `Explore the latest insights and deep technical analysis on ${keyword} in our comprehensive guide.`;
+
     return {
-      title: `${keyword}: The 2026 Definitive Deep-Dive`,
+      title: dynamicTitle,
       content: fullContent,
-      metaDescription: cleanResult(metaCompletion.choices[0].message.content || "").replace(/^["']|["']$/g, "")
+      metaDescription: dynamicMeta
     };
   } catch (err: any) {
     console.error("[REASONING ERROR]", err);
@@ -417,40 +431,37 @@ export async function generateOgImage(title: string, context?: string): Promise<
   
   try {
     const visualVibes = [
-      "Cyberpunk Neon: High contrast, dark backgrounds with vibrant neon edges, futuristic tech elements, cinematic lighting.",
-      "Minimalist Swiss: Clean lines, bold typography, monochromatic with one accent color, premium editorial feel.",
-      "Vibrant 3D Pop: Hyper-realistic 3D rendering, claymorphism, playful colors, soft shadows, studio lighting.",
-      "Abstract Organic: Flowing shapes, natural gradients, soft textures, peaceful and premium aesthetic.",
-      "Tech-Noir Investigative: Gritty, moody, dark atmosphere, blue/teal color palette, high-tech interface elements.",
-      "Hyper-Realistic Macro: Extreme close-up of high-tech materials, glass, metal, and light reflections."
+      "Premium Tech Editorial: High-fidelity product photography style, clean studio lighting, soft shadows, 8k resolution, elegant and sophisticated.",
+      "Futuristic Isometric 3D: Clean 3D isometric representation of the concept, claymorphism, soft gradients, professional and modern.",
+      "Minimalist Abstract: Sophisticated geometric shapes, premium textures (glass, brushed metal), monochromatic with deep blue or teal accents.",
+      "Macro High-Tech: Extreme close-up of premium materials relevant to the topic, cinematic depth of field, sharp focus, vibrant yet professional colors."
     ];
     
+    // Choose a vibe but prioritize a clean editorial look
     const selectedVibe = visualVibes[Math.floor(Math.random() * visualVibes.length)];
-    const contextInfo = context ? `Article Context: ${context}` : "";
+    const contextInfo = context ? `Core Concept Context: ${context}` : "";
 
     // A. Generate a high-quality, catchy prompt using Groq
     const promptCompletion = await callGroq({
       messages: [
         {
           role: "system",
-          content: `You are an expert AI prompt engineer. Your goal is to write a highly detailed, 1-sentence image generation prompt that creates a PREMIUM, attention-grabbing, and HIGH-RELEVANCE image for an article. 
-          Use the provided title and context to ensure the image directly relates to the topic. 
-          Follow the specific visual style/vibe provided. 
-          Avoid generic results. Do not include any text, letters, or words in the image.
-          CRITICAL: Return ONLY a descriptive text prompt. NEVER return a URL, link, or image path.`
+          content: `You are a world-class visual designer and AI prompt engineer. 
+          Your goal is to write a single, highly-descriptive sentence for an AI image generator (DALL-E 3) that captures the ESSENCE of the article topic with total relevance. 
+          The image must look like it belongs in a premium tech magazine like Wired or The Verge.
+          Avoid all human faces. Avoid any text, logos, or letters. 
+          Focus on high-quality materials, lighting, and composition. 
+          CRITICAL: Return ONLY the description, no preamble.`
         },
         {
           role: "user",
-          content: `Topic: "${title}". ${contextInfo}\nVisual Style Vibe: ${selectedVibe}\n\nTask: Generate a detailed 1-sentence DALL-E 3 prompt. Return JSON with 'prompt'.`
+          content: `Topic: "${title}". ${contextInfo}\nVisual Style Guideline: ${selectedVibe}\n\nTask: Generate a detailed 1-sentence prompt for a hero image that perfectly represents this specific content.`
         }
       ],
-      model: DISCOVERY_MODEL,
-      response_format: { type: "json_object" }
+      model: DISCOVERY_MODEL
     });
     
-    const content = promptCompletion.choices[0].message.content || "{}";
-    const data = safeJsonParse(content, 'Image Prompt');
-    let imagePrompt = data.prompt || `A premium and relevant 3D concept art piece representing: ${title}`;
+    let imagePrompt = cleanResult(promptCompletion.choices[0].message.content || `A premium and relevant 3D concept art piece representing: ${title}`);
 
     // Safety Check: If the AI returned a URL instead of a prompt, discard it
     if (imagePrompt.startsWith('http') || imagePrompt.includes('unsplash.com') || imagePrompt.includes('rebrand.ly')) {
@@ -479,7 +490,8 @@ export async function generateOgImage(title: string, context?: string): Promise<
     // C. Fallback to free AI Image generation (Pollinations) if DALL-E limit hit or no keys
     const randomSeed = Math.floor(Math.random() * 100000);
     console.log(`[SEO] DALL-E skipped or failed. Falling back to Pollinations with seed: ${randomSeed}`);
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${randomSeed}`;
+    // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${randomSeed}`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
@@ -492,7 +504,7 @@ export async function generateOgImage(title: string, context?: string): Promise<
     return fallbackUrl;
   } catch (err: any) {
     console.warn(`[SEO ERROR] Image generation failed:`, err.message || err);
-    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}?width=1200&height=630&nologo=true`;
+    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}.jpg?width=1200&height=630&nologo=true`;
     try { await fetch(errorFallback); } catch (e) {}
     return errorFallback;
   }
