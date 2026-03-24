@@ -10,12 +10,10 @@ export const maxDuration = 300; // 5 minutes – allow time for many posts
  */
 function isBrokenImage(url: string | undefined): boolean {
   if (!url) return true;
-  // rebrand.ly was a broken placeholder used in early articles
   if (url.includes('rebrand.ly')) return true;
-  // Two Unsplash photos were hardcoded as defaults across all early articles:
-  // 1. photo-1677442136019 — a generic tech graphic
-  // 2. photo-1451187580459 — planet Earth (the visible default the user reported)
   if (url.includes('unsplash.com')) return true;
+  // Previously we used image.pollinations.ai/prompt/ but this was deprecated and returns 404 ORB blocks
+  if (url.includes('image.pollinations.ai')) return true;
   return false;
 }
 
@@ -32,14 +30,19 @@ export async function GET() {
     for (const post of broken) {
       try {
         console.log(`[FIX-IMAGES] Regenerating image for: "${post.title}" (id: ${post.id})`);
+        
+        // Use our upgraded agent system to generate the new, highly creative prompt and image URL
+        // `generateOgImage` in `lib/agents.ts` now securely uses the properly authenticated `gen.pollinations.ai` endpoints
         const newImageUrl = await generateOgImage(post.title, post.keyword);
+        
+        // This is the CRITICAL missing link. updatePost saves to Redis if KV_URL is available!
         await updatePost(post.id, { ogImageUrl: newImageUrl });
 
         results.push({ id: post.id, title: post.title, status: 'fixed', newUrl: newImageUrl });
         console.log(`[FIX-IMAGES] ✅ Fixed: ${post.id}`);
 
-        // Small delay between posts to stay within rate limits
-        await new Promise(r => setTimeout(r, 3000));
+        // Rate limit for Groq & Pollinations 
+        await new Promise(r => setTimeout(r, 2000));
       } catch (err: any) {
         const errorMsg = err?.message || String(err);
         console.error(`[FIX-IMAGES] ❌ Failed for post ${post.id}:`, errorMsg);
