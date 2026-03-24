@@ -468,7 +468,7 @@ export async function generateOgImage(title: string, context?: string): Promise<
         },
         {
           role: "user",
-          content: `Topic: "${title}". ${contextInfo}\nVisual Style Guideline: ${selectedVibe}\n\nTask: Generate a detailed 1-sentence prompt for a hero image that perfectly represents this specific content.`
+          content: `ARTICLE TITLE: "${title}"\n${contextInfo}\nVisual Style: ${selectedVibe}\n\nWrite a 1-sentence, hyper-specific image prompt that creates a visual that ONLY makes sense for THIS article and no other. Be as literal and concrete as possible about what should appear in the image.`
         }
       ],
       model: DISCOVERY_MODEL
@@ -501,10 +501,13 @@ export async function generateOgImage(title: string, context?: string): Promise<
     }
 
     // C. Fallback to free AI Image generation (Pollinations) if DALL-E limit hit or no keys
-    const randomSeed = Math.floor(Math.random() * 100000);
-    console.log(`[SEO] DALL-E skipped or failed. Falling back to Pollinations with seed: ${randomSeed}`);
+    // Use a seed derived from the title to guarantee unique images per article
+    const titleSeed = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 999983;
+    const randomBoost = Math.floor(Math.random() * 10000);
+    const uniqueSeed = titleSeed + randomBoost;
+    console.log(`[SEO] Falling back to Pollinations. Unique seed: ${uniqueSeed}`);
     // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${randomSeed}`;
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
