@@ -319,7 +319,7 @@ async function generateOutline(keyword: string) {
       messages: [
         {
           role: "system",
-          content: "You are an expert content strategist. Create a comprehensive outline for a 2,000-word deep-dive article."
+          content: "You are an expert content strategist. Create a comprehensive outline for a high-quality article. The outline sections must be specific, insightful, and directly relevant to the topic — no generic or filler sections."
         },
         {
           role: "user",
@@ -345,8 +345,9 @@ async function generateSection(title: string, keyword: string, productContext: s
     messages: [
       {
         role: "system",
-        content: `You are a world-class investigative tech journalist. Write a deep-dive section for a mega-post. 
-        Focus on 'Information Gain'—original insights and technical depth. Tone: Sophisticated and analytical.`
+          content: `You are a world-class journalist and expert writer. Write a compelling, insightful article section.
+        Focus on original, factual, and genuinely useful content. Tone: confident, conversational, and premium — like Wired or The Verge.
+        NEVER use phrases like "deep dive", "delve into", "in conclusion", "in this article we will", or any other filler.`
       },
       {
         role: "user",
@@ -399,11 +400,23 @@ export async function generateArticle(keyword: string): Promise<DraftArticle> {
       messages: [
         {
           role: "system",
-          content: "You are an expert copywriter. Generate a highly clickable, premium article title and an SEO-optimized meta description. Return JSON with 'title' (string, max 60 chars) and 'metaDescription' (string, max 160 chars)."
+          content: `You are a world-class headline writer for premium digital publications like WIRED, The Verge, and TechCrunch.
+
+Your job: write a UNIQUE, CREATIVE, and SPECIFIC article title that:
+- Captures the exact essence of the topic
+- Sparks intense curiosity or provides a clear promise of value
+- Sounds fresh and original — NOT like a textbook or blog template
+- Is punchy, memorable, and uses strong action or power words
+
+NEVER use these banned phrases: "deep dive", "a look at", "comprehensive guide", "everything you need to know", "complete guide", "in-depth", "ultimate guide", "information gain", or any subtitle with "into".
+
+Return JSON with:
+- "title": string (max 70 chars, NO colons unless used creatively)
+- "metaDescription": string (max 160 chars, compelling and SEO-rich)`
         },
         { 
           role: "user", 
-          content: `Topic: "${keyword}".` 
+          content: `Write a headline for an article about: "${keyword}". Make it sound like it belongs on the front page of WIRED magazine.` 
         }
       ],
       model: DISCOVERY_MODEL,
