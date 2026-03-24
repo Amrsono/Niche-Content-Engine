@@ -8,6 +8,7 @@ import AdSenseInArticle from '@/app/components/AdSenseInArticle';
 import AdSenseDisplay from '@/app/components/AdSenseDisplay';
 import AmazonAdBanner from '@/app/components/AmazonAdBanner';
 import SidebarAd from '@/app/components/SidebarAd';
+import adStyles from '@/app/components/AdStyles.module.css';
 import { use, useEffect } from 'react';
 import { trackView } from '@/lib/analytics';
 
@@ -60,12 +61,12 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
     <main className={styles.blogContainer}>
       <FloatingNav />
       
-      <div className={styles.blogLayoutWrapper}>
+      <div className={adStyles.blogLayoutWrapper}>
         {/* Left Sidebar Ad */}
         <SidebarAd />
 
         {/* Main Content */}
-        <div className={styles.mainColumn}>
+        <div className={adStyles.mainColumn}>
           <article className={styles.readerContainer}>
             <header className={styles.readerHeader}>
               <div className={styles.tag} style={{ fontSize: '1rem', marginBottom: '20px' }}>{post.keyword}</div>
