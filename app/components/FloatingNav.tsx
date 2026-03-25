@@ -7,7 +7,11 @@ import { UserButton, SignInButton, useUser } from '@clerk/nextjs';
 import styles from './FloatingNav.module.css';
 
 export function FloatingNav() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
 
   return (
     <motion.nav 
@@ -22,11 +26,13 @@ export function FloatingNav() {
       </div>
       
       <div className={styles.links}>
-        {isSignedIn && <Link href="/" className={styles.link}>Dashboard</Link>}
+        {isAdmin && <Link href="/" className={styles.link}>Dashboard</Link>}
         <Link href="/blog" className={styles.link}>Pulse Blog</Link>
         <Link href="/about" className={styles.link}>About</Link>
         <Link href="/contact" className={styles.link}>Contact</Link>
-        {isSignedIn && (
+        <Link href="/privacy" className={styles.link}>Privacy</Link>
+        <Link href="/terms" className={styles.link}>Terms</Link>
+        {isAdmin && (
           <>
             <Link href="/analytics" className={styles.link}>Analytics</Link>
             <Link href="/history" className={styles.link} style={{ color: '#a78bfa' }}>History</Link>

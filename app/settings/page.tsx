@@ -1,7 +1,8 @@
 "use client";
 export const dynamic = 'force-dynamic';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { FloatingNav } from '../components/FloatingNav';
 import { useTheme, Theme } from '../components/ThemeProvider';
 import styles from './settings.module.css';
@@ -50,18 +51,21 @@ const THEMES: { id: Theme; label: string; description: string; icon: React.React
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
+  const router = useRouter();
 
-  if (isLoaded && !isSignedIn) {
-    return (
-      <main className={styles.main}>
-        <FloatingNav />
-        <div className={styles.unauthorized}>
-          <h2>Access Restricted</h2>
-          <p>Please sign in to access Settings.</p>
-        </div>
-      </main>
-    );
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
+
+  useEffect(() => {
+    if (isLoaded && !isAdmin) {
+      router.push("/blog");
+    }
+  }, [isLoaded, isAdmin, router]);
+
+  if (isLoaded && !isAdmin) {
+    return null;
   }
 
   return (

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { usePosts } from "@/lib/useLocalPosts";
 import { getAllAnalytics } from "@/lib/analytics";
 import { FloatingNav } from "@/app/components/FloatingNav";
@@ -17,6 +19,19 @@ interface PostWithAnalytics extends Post {
 }
 
 export default function HistoryPage() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const router = useRouter();
+
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
+
+  useEffect(() => {
+    if (isLoaded && !isAdmin) {
+      router.push("/blog");
+    }
+  }, [isLoaded, isAdmin, router]);
+
   const { posts, refresh, isLoading } = usePosts();
   const [analytics, setAnalytics] = useState<Record<string, { views: number; adClicks: number }>>({});
   const [sortKey, setSortKey] = useState<SortKey>("publishedAt");

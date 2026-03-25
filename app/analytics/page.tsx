@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { FloatingNav } from '../components/FloatingNav';
 import { BentoBox } from '../components/BentoBox';
 import { 
@@ -23,6 +25,19 @@ const metrics = [
 ];
 
 export default function AnalyticsPage() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const router = useRouter();
+
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
+
+  useEffect(() => {
+    if (isLoaded && !isAdmin) {
+      router.push("/blog");
+    }
+  }, [isLoaded, isAdmin, router]);
+
   const [targetNiches, setTargetNiches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('24h');

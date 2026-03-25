@@ -514,7 +514,7 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     const pollKey = process.env.POLLINATIONS_API_KEY || 'pk_31oNBvU9JLA1ApNX';
     
     // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
-    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux&key=${pollKey}`;
+    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux&key=${pollKey}`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
@@ -626,13 +626,22 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
     // Normalize image URL: Instagram requires the URL to resolve to a JPEG.
     // Pollinations URLs need a .jpg extension before the query string.
     let imageUrl = article.ogImageUrl || '';
-    if (imageUrl.includes('image.pollinations.ai') && !imageUrl.includes('.jpg?') && !imageUrl.endsWith('.jpg')) {
+    if ((imageUrl.includes('pollinations.ai')) && !imageUrl.includes('.jpg?') && !imageUrl.endsWith('.jpg')) {
       // Insert .jpg before the query string if present, or append it
-      imageUrl = imageUrl.includes('?')
-        ? imageUrl.replace('?', '.jpg?')
+      imageUrl = imageUrl.includes('?') 
+        ? imageUrl.replace('?', '.jpg?') 
         : imageUrl + '.jpg';
     }
-    console.log(`[INSTAGRAM] Using image URL: ${imageUrl}`);
+
+    // Use a proxy for Pollinations images to ensure stable delivery to Meta (Fixes 9004)
+    if (imageUrl.includes('pollinations.ai')) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
+      const proxyUrl = `${appUrl}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+      console.log(`[INSTAGRAM] Using Proxied Image: ${proxyUrl}`);
+      imageUrl = proxyUrl;
+    } else {
+      console.log(`[INSTAGRAM] Using image URL: ${imageUrl}`);
+    }
 
     // Move access_token to Query String for maximum reliability
     const containerRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`, {
@@ -646,17 +655,23 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
 
     const containerData = await containerRes.json();
     if (!containerData.id) {
-      const fbError = containerData.error?.message || "Failed to create media container";
-      const fbCode = containerData.error?.code ? `(Code ${containerData.error.code})` : "";
+      let fbError = containerData.error?.message || "Failed to create media container";
+      const fbCode = containerData.error?.code;
+      
+      if (fbCode === 25) {
+        fbError = "User access is restricted. Your token likely lacks 'instagram_basic' or 'instagram_content_publish' permissions. Check implementation_plan.md.";
+      }
+      
+      const codeStr = fbCode ? `(Code ${fbCode})` : "";
       console.error('[INSTAGRAM ERROR]', JSON.stringify(containerData, null, 2));
-      throw new Error(`${fbError} ${fbCode}`);
+      throw new Error(`${fbError} ${codeStr}`);
     }
 
     const creationId = containerData.id;
     console.log(`[SOCIAL] Container created: ${creationId}. Waiting for processing...`);
 
     // Step 2: Meta needs a moment to process the image
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    await new Promise(resolve => setTimeout(resolve, 15000));
 
     // Step 3: Publish Media
     console.log(`[SOCIAL] Publishing to Instagram...`);
@@ -670,10 +685,16 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
 
     const publishData = await publishRes.json();
     if (!publishData.id) {
-       const fbError = publishData.error?.message || "Failed to publish media";
-       const fbCode = publishData.error?.code ? `(Code ${publishData.error.code})` : "";
+       let fbError = publishData.error?.message || "Failed to publish media";
+       const fbCode = publishData.error?.code;
+       
+       if (fbCode === 25) {
+         fbError = "User access is restricted. This typically means your token is missing 'instagram_basic' or 'instagram_content_publish' permissions, or the account has a security checkpoint. Please check the instructions in the implementation_plan.md.";
+       }
+       
+       const codeStr = fbCode ? `(Code ${fbCode})` : "";
        console.error('[INSTAGRAM ERROR PUBLISH]', JSON.stringify(publishData, null, 2));
-       throw new Error(`${fbError} ${fbCode}`);
+       throw new Error(`${fbError} ${codeStr}`);
     }
 
     // Fetch the actual permalink for the published media

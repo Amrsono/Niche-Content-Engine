@@ -1,3 +1,5 @@
+import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { FloatingNav } from "./components/FloatingNav";
 import { BentoBox } from "./components/BentoBox";
 import { PulseTerminal } from "./components/PulseTerminal";
@@ -5,7 +7,17 @@ import { EarningsAnalytics } from "./components/EarningsAnalytics";
 import { TrendHeatmap } from "./components/TrendHeatmap";
 import styles from "./page.module.css";
 
-export default function Home() {
+export default async function Home() {
+  const user = await currentUser();
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  
+  const isAdmin = userEmail && adminEmails.includes(userEmail);
+
+  if (!isAdmin) {
+    redirect("/blog");
+  }
+
   return (
     <main className={styles.main}>
       <FloatingNav />
