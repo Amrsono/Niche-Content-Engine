@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const shareImage = post.ogImageUrl || defaultOgImage;
 
   return {
-    title: `${post.title} | Pulse Blog`,
+    title: post.title,
     description,
     openGraph: {
       title: post.title,
@@ -44,10 +44,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           width: 1200,
           height: 630,
           alt: post.title,
+          type: 'image/jpeg',
         },
       ],
       type: 'article',
       publishedTime: post.publishedAt,
+      authors: ['NicheEngine AI'],
     },
     twitter: {
       card: 'summary_large_image',

@@ -18,8 +18,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Niche Content Engine",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app'),
+  title: {
+    default: "Niche Content Engine",
+    template: "%s | Niche Content Engine"
+  },
   description: "Autonomous AI-powered content generation for niche blogs.",
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://niche-content-engine.vercel.app',
+    siteName: 'Niche Content Engine',
+  },
   verification: {
     google: "j8CCN_dus6I_nlRXK38gHcVuQETYhAIDlA7PF8HY6hM",
   },
