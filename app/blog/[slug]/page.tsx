@@ -28,7 +28,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = post.content.replace(/<[^>]*>/g, '').slice(0, 160) + '...';
 
   const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
-  const shareImage = post.ogImageUrl || defaultOgImage;
+  
+  // Always route through proxy for Meta compatibility
+  const shareImage = (post.ogImageUrl && post.ogImageUrl.includes('/api/image-proxy')) 
+    ? post.ogImageUrl 
+    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(post.ogImageUrl || defaultOgImage)}`;
 
   return {
     title: post.title,
@@ -50,6 +54,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: 'article',
       publishedTime: post.publishedAt,
       authors: ['NicheEngine AI'],
+    },
+    facebook: {
+      appId: process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
     },
     twitter: {
       card: 'summary_large_image',

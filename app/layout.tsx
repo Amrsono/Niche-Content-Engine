@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     url: 'https://niche-content-engine.vercel.app',
     siteName: 'Niche Content Engine',
   },
+  facebook: {
+    appId: process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
+  },
   verification: {
     google: "j8CCN_dus6I_nlRXK38gHcVuQETYhAIDlA7PF8HY6hM",
   },
