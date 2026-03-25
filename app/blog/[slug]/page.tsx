@@ -70,6 +70,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     other: {
       'image_src': shareImage,
+      'fb:app_id': process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
+      'debug-version': 'v4-facebook-priority-fix'
     }
   };
 }

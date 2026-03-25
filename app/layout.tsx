@@ -33,6 +33,10 @@ export const metadata: Metadata = {
   facebook: {
     appId: process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
   },
+  other: {
+    'fb:app_id': process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
+    'debug-version': 'v4-facebook-priority-fix'
+  },
   verification: {
     google: "j8CCN_dus6I_nlRXK38gHcVuQETYhAIDlA7PF8HY6hM",
   },
