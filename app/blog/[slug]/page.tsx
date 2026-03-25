@@ -86,9 +86,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       images: [shareImage],
     },
     other: {
-      'image_src': shareImage,
-      'fb:app_id': process.env.NEXT_PUBLIC_FB_APP_ID || '2464563490653501',
-      'debug-version': 'v4-facebook-priority-fix'
+      'debug-version': 'v5-facebook-priority-fix'
     }
   };
 }
