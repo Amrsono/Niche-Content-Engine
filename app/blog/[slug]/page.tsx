@@ -1,7 +1,6 @@
-"use client";
-
-import { usePosts } from '@/lib/useLocalPosts';
+import { getPostBySlug } from '@/lib/storage';
 import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 import styles from '../blog.module.css';
 import { FloatingNav } from '@/app/components/FloatingNav';
 import AdSenseInArticle from '@/app/components/AdSenseInArticle';
@@ -9,13 +8,56 @@ import AdSenseDisplay from '@/app/components/AdSenseDisplay';
 import AmazonAdBanner from '@/app/components/AmazonAdBanner';
 import SidebarAd from '@/app/components/SidebarAd';
 import adStyles from '@/app/components/AdStyles.module.css';
-import { use, useEffect } from 'react';
-import { trackView } from '@/lib/analytics';
+import { ViewTracker } from './ViewTracker';
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
 
 /**
- * Splits HTML content after the Nth closing </p> tag.
- * Returns [before, after] — both are valid HTML strings.
+ * Dynamic Metadata for SEO & Social Sharing
  */
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+
+  if (!post) return {};
+
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
+  const postUrl = `${siteUrl}/blog/${slug}`;
+  const description = post.content.replace(/<[^>]*>/g, '').slice(0, 160) + '...';
+
+  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
+  const shareImage = post.ogImageUrl || defaultOgImage;
+
+  return {
+    title: `${post.title} | Pulse Blog`,
+    description,
+    openGraph: {
+      title: post.title,
+      description,
+      url: postUrl,
+      siteName: 'Niche Content Engine',
+      images: [
+        {
+          url: shareImage,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
+      type: 'article',
+      publishedTime: post.publishedAt,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description,
+      images: [shareImage],
+    },
+  };
+}
+
 function splitAfterNthParagraph(html: string, n: number): [string, string] {
   let count = 0;
   let idx = 0;
@@ -23,33 +65,14 @@ function splitAfterNthParagraph(html: string, n: number): [string, string] {
     const next = html.indexOf('</p>', idx);
     if (next === -1) break;
     count++;
-    idx = next + 4; // length of '</p>'
+    idx = next + 4;
   }
   return [html.slice(0, idx), html.slice(idx)];
 }
 
-export default function PostReader({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const { posts } = usePosts();
-  const post = posts.find(p => p.slug === slug);
-
-  // Track a view on every visit
-  useEffect(() => {
-    if (post?.slug) {
-      trackView(post.slug);
-    }
-  }, [post?.slug]);
-
-
-  // Show loading state while localStorage hydrates
-  if (posts.length === 0) {
-    return (
-      <main className={styles.blogContainer}>
-        <FloatingNav />
-        <div style={{ textAlign: 'center', paddingTop: '200px', color: '#64748b' }}>Loading...</div>
-      </main>
-    );
-  }
+export default async function PostReader({ params }: PageProps) {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
 
   if (!post) {
     notFound();
@@ -60,16 +83,16 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
   return (
     <main className={styles.blogContainer}>
       <FloatingNav />
+      {/* Client-side tracking */}
+      <ViewTracker slug={slug} />
       
       <div className={adStyles.blogLayoutWrapper}>
-        {/* Left Sidebar Ad */}
         <SidebarAd 
           link="https://amzn.to/47myeq5"
           label="Best Sellers"
           image="/ads/amazon_bestsellers_ad_sidebar.png"
         />
 
-        {/* Main Content */}
         <div className={adStyles.mainColumn}>
           <article className={styles.readerContainer}>
             <header className={styles.readerHeader}>
@@ -90,40 +113,26 @@ export default function PostReader({ params }: { params: Promise<{ slug: string 
                 src={post.ogImageUrl || `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`} 
                 alt={post.title}
                 style={{ width: '100%', height: 'auto', display: 'block' }}
-                onError={(e) => { 
-                  const target = e.target as HTMLImageElement;
-                  // Fallback: generate an alternative image from the title
-                  if (!target.src.includes('fallback=true')) {
-                    target.src = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title)}?width=1200&height=630&nologo=true&seed=42&fallback=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
-                  }
-                }}
               />
             </div>
 
-            {/* First 2 paragraphs */}
             <div 
               className={styles.articleBody}
               dangerouslySetInnerHTML={{ __html: contentBefore }}
             />
 
-            {/* In-article ad — placed after 2nd paragraph as per Google's recommendation */}
             <AdSenseInArticle />
 
-            {/* Rest of article */}
             <div 
               className={styles.articleBody}
               dangerouslySetInnerHTML={{ __html: contentAfter }}
             />
 
-            {/* Amazon Shopping Ad placeholder */}
             <AmazonAdBanner />
-
-            {/* Display ad at the very bottom of each article */}
             <AdSenseDisplay style={{ marginTop: '1rem' }} />
           </article>
         </div>
 
-        {/* Right Sidebar Ad */}
         <SidebarAd 
           link="https://amzn.to/4bZ6kmB"
           label="Hot New Releases"

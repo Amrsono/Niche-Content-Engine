@@ -45,16 +45,21 @@ async function testInstagram() {
     console.log('Checking Permissions...');
     const permRes = await fetch(`https://graph.facebook.com/v20.0/me/permissions?access_token=${token}`);
     const permData = await permRes.json();
-    const permissions = permData.data?.filter(p => p.status === 'granted').map(p => p.permission);
-    console.log('Granted Permissions:', permissions.join(', '));
     
-    const required = ['instagram_basic', 'instagram_content_publish'];
-    const missing = required.filter(p => !permissions.includes(p));
-    
-    if (missing.length > 0) {
-      console.warn('⚠️ Missing recommended permissions:', missing.join(', '));
+    if (permData.error) {
+      console.error('Permission Check Error:', permData.error.message);
     } else {
-      console.log('✅ All required permissions are present.');
+      const permissions = permData.data?.filter(p => p.status === 'granted').map(p => p.permission) || [];
+      console.log('Granted Permissions:', permissions.length > 0 ? permissions.join(', ') : 'NONE');
+      
+      const required = ['instagram_basic', 'instagram_content_publish'];
+      const missing = required.filter(p => !permissions.includes(p));
+      
+      if (missing.length > 0) {
+        console.warn('⚠️ Missing recommended permissions:', missing.join(', '));
+      } else {
+        console.log('✅ All required permissions are present.');
+      }
     }
 
   } catch (error) {
