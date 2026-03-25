@@ -9,6 +9,7 @@ import AmazonAdBanner from '@/app/components/AmazonAdBanner';
 import SidebarAd from '@/app/components/SidebarAd';
 import adStyles from '@/app/components/AdStyles.module.css';
 import { ViewTracker } from './ViewTracker';
+import { ArticleImage } from './ArticleImage';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -143,18 +144,10 @@ export default async function PostReader({ params }: PageProps) {
             </header>
 
             <div className={styles.featuredImageArea}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={post.ogImageUrl || defaultOgImage} 
+              <ArticleImage 
+                initialSrc={post.ogImageUrl || defaultOgImage}
                 alt={post.title}
-                style={{ width: '100%', height: 'auto', display: 'block' }}
-                onError={(e) => { 
-                  const target = e.target as HTMLImageElement;
-                  // Fallback to simpler generated image if primary fails
-                  if (!target.src.includes('fallback=true')) {
-                    target.src = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title)}?width=1200&height=630&nologo=true&seed=42&fallback=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
-                  }
-                }}
+                title={post.title}
               />
             </div>
 
