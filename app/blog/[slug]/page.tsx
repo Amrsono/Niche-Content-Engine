@@ -15,6 +15,22 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+function getAuthorizedImageUrl(url: string | undefined, title: string): string {
+  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
+  let finalUrl = url || defaultOgImage;
+  
+  // If it's already a proxy URL, let the proxy handle the authorization.
+  if (finalUrl.includes('/api/image-proxy')) {
+    return finalUrl;
+  }
+  
+  if (finalUrl.includes('pollinations.ai') && !finalUrl.includes('key=')) {
+    finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'key=pk_31oNBvU9JLA1ApNX';
+  }
+  
+  return finalUrl;
+}
+
 /**
  * Dynamic Metadata for SEO & Social Sharing
  */
@@ -28,12 +44,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const postUrl = `${siteUrl}/blog/${slug}`;
   const description = post.content.replace(/<[^>]*>/g, '').slice(0, 160) + '...';
 
-  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
+  const authImageUrl = getAuthorizedImageUrl(post.ogImageUrl, post.title);
   
   // ALWAYS route through PROXY for absolute compatibility with Facebook/Instagram scrapers
-  const shareImage = (post.ogImageUrl && post.ogImageUrl.includes('/api/image-proxy')) 
-    ? post.ogImageUrl 
-    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(post.ogImageUrl || defaultOgImage)}`;
+  const shareImage = authImageUrl.includes('/api/image-proxy') 
+    ? authImageUrl 
+    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(authImageUrl)}`;
 
   return {
     title: post.title,
@@ -100,10 +116,11 @@ export default async function PostReader({ params }: PageProps) {
   const [contentBefore, contentAfter] = splitAfterNthParagraph(post.content, 2);
 
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
-  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
-  const shareImage = (post.ogImageUrl && post.ogImageUrl.includes('/api/image-proxy')) 
-    ? post.ogImageUrl 
-    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(post.ogImageUrl || defaultOgImage)}`;
+  const authImageUrl = getAuthorizedImageUrl(post.ogImageUrl, post.title);
+  
+  const shareImage = authImageUrl.includes('/api/image-proxy') 
+    ? authImageUrl 
+    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(authImageUrl)}`;
 
   return (
     <main className={styles.blogContainer}>
@@ -145,7 +162,7 @@ export default async function PostReader({ params }: PageProps) {
 
             <div className={styles.featuredImageArea}>
               <ArticleImage 
-                initialSrc={post.ogImageUrl || defaultOgImage}
+                initialSrc={authImageUrl}
                 alt={post.title}
                 title={post.title}
               />

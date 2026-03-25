@@ -8,10 +8,15 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const imageUrl = searchParams.get('url');
+  let imageUrl = searchParams.get('url');
 
   if (!imageUrl) {
     return new NextResponse('Missing URL parameter', { status: 400 });
+  }
+
+  // Inject the required API key for legacy database URLs missing it
+  if (imageUrl.includes('pollinations.ai') && !imageUrl.includes('key=')) {
+    imageUrl += (imageUrl.includes('?') ? '&' : '?') + 'key=pk_31oNBvU9JLA1ApNX';
   }
 
   try {
