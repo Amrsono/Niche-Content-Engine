@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
   
-  // Always route through proxy for Meta compatibility
+  // ALWAYS route through PROXY for absolute compatibility with Facebook/Instagram scrapers
   const shareImage = (post.ogImageUrl && post.ogImageUrl.includes('/api/image-proxy')) 
     ? post.ogImageUrl 
     : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(post.ogImageUrl || defaultOgImage)}`;
@@ -37,6 +37,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: post.title,
     description,
+    alternates: {
+      canonical: postUrl,
+    },
     openGraph: {
       title: post.title,
       description,
@@ -45,6 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       images: [
         {
           url: shareImage,
+          secureUrl: shareImage,
           width: 1200,
           height: 630,
           alt: post.title,
@@ -64,6 +68,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       images: [shareImage],
     },
+    other: {
+      'image_src': shareImage,
+    }
   };
 }
 
@@ -89,8 +96,25 @@ export default async function PostReader({ params }: PageProps) {
 
   const [contentBefore, contentAfter] = splitAfterNthParagraph(post.content, 2);
 
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
+  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
+  const shareImage = (post.ogImageUrl && post.ogImageUrl.includes('/api/image-proxy')) 
+    ? post.ogImageUrl 
+    : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(post.ogImageUrl || defaultOgImage)}`;
+
   return (
     <main className={styles.blogContainer}>
+      {/* 
+        HACK: Hidden image at the very top of the <body> to ensure 
+        lazy social scrapers prioritize the featured image over sidebar ads.
+      */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img 
+        src={shareImage} 
+        alt="" 
+        style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '1px', height: '1px' }} 
+      />
+
       <FloatingNav />
       {/* Client-side tracking */}
       <ViewTracker slug={slug} />
@@ -119,7 +143,7 @@ export default async function PostReader({ params }: PageProps) {
             <div className={styles.featuredImageArea}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src={post.ogImageUrl || `https://gen.pollinations.ai/image/${encodeURIComponent(post.title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`} 
+                src={shareImage} 
                 alt={post.title}
                 style={{ width: '100%', height: 'auto', display: 'block' }}
               />
