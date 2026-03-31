@@ -6,13 +6,14 @@ import type { Post } from '@/lib/types';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
 import AdSenseDisplay from '../components/AdSenseDisplay';
-import { Instagram, X, Video, Share2, Loader2 } from 'lucide-react';
+import { Instagram, X, Video, Share2, Loader2, Facebook } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import SidebarAd from '../components/SidebarAd';
 import adStyles from '../components/AdStyles.module.css';
+import SmartImage from '../components/SmartImage';
 
-const FALLBACK_IMG = 'https://gen.pollinations.ai/image/sleek%20futuristic%20abstract%20technology%20concept%2C%20premium%20dark%20editorial%20style%2C%20glassmorphism%2C%20neon%20accents%2C%20no%20text?width=800&height=420&nologo=true&seed=42&model=flux&key=pk_31oNBvU9JLA1ApNX';
+const FALLBACK_IMG = 'https://image.pollinations.ai/prompt/sleek%20futuristic%20abstract%20technology%20concept%2C%20premium%20dark%20editorial%20style%2C%20glassmorphism%2C%20neon%20accents%2C%20no%20text?width=800&height=420&nologo=true&seed=42&model=flux';
 
 export default function BlogPage() {
   const { posts, refresh } = usePosts();
@@ -30,7 +31,7 @@ export default function BlogPage() {
     return () => window.removeEventListener('posts-updated', handleUpdate);
   }, [refresh]);
 
-  const handleSignal = async (slug: string, platform: 'twitter' | 'instagram' | 'tiktok') => {
+  const handleSignal = async (slug: string, platform: 'twitter' | 'instagram' | 'tiktok' | 'facebook') => {
     try {
       setSignaling(prev => ({ ...prev, [`${slug}-${platform}`]: true }));
       const res = await fetch('/api/social', {
@@ -158,12 +159,35 @@ export default function BlogPage() {
                       style={{ cursor: 'pointer' }}
                     >
                       <div className={styles.imageWrapper}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src={post.ogImageUrl || FALLBACK_IMG} 
+                        <SmartImage 
+                          initialSrc={(() => {
+                            const u = post.ogImageUrl || FALLBACK_IMG;
+                            // Check if it's already proxied to avoid double-proxy loops
+                            if (u.startsWith('/api/image-proxy') || u.includes('%2Fapi%2Fimage-proxy')) {
+                              return u;
+                            }
+                            
+                            const isDeprecated = 
+                              u.includes('pollinations.ai/p/') || 
+                              u.includes('gen.pollinations.ai') ||
+                              u.includes('rebrand.ly') || 
+                              u.includes('unsplash.com') || 
+                              u.includes('%22');
+                            
+                            const finalBaseUrl = isDeprecated 
+                              ? `https://image.pollinations.ai/prompt/${encodeURIComponent(post.title + ' digital art cinematic')}?width=800&height=420&nologo=true&enhance=true&model=flux`
+                              : u;
+                                
+                            return `/api/image-proxy?url=${encodeURIComponent(finalBaseUrl)}`;
+                          })()} 
                           alt={post.title}
                           style={{ width: '100%', height: '210px', objectFit: 'cover', display: 'block' }}
-                          onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
+                          onError={(e) => { 
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.includes('fallback=true')) {
+                              target.src = `/api/image-proxy?url=${encodeURIComponent(FALLBACK_IMG + '&fallback=true')}`; 
+                            }
+                          }}
                         />
                       </div>
                       <div className={styles.cardContent}>
@@ -227,6 +251,24 @@ export default function BlogPage() {
                                   title="Signal to TikTok"
                                 >
                                   {signaling[`${post.slug}-tiktok`] ? <Loader2 size={14} className={styles.spin} /> : <Video size={14} />}
+                                  <span>Signal</span>
+                                </button>
+                              )
+                            )}
+                            
+                            {post.facebookUrl ? (
+                              <a href={post.facebookUrl} target="_blank" rel="noopener noreferrer" title="View on Facebook" className={styles.socialIconActive}>
+                                <Facebook size={18} />
+                              </a>
+                            ) : (
+                              isSignedIn && (
+                                <button 
+                                  onClick={() => handleSignal(post.slug, 'facebook')}
+                                  disabled={signaling[`${post.slug}-facebook`]}
+                                  className={styles.signalButton}
+                                  title="Signal to Facebook"
+                                >
+                                  {signaling[`${post.slug}-facebook`] ? <Loader2 size={14} className={styles.spin} /> : <Facebook size={14} />}
                                   <span>Signal</span>
                                 </button>
                               )

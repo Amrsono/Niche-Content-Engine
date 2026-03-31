@@ -50,6 +50,7 @@ export async function GET(request: Request) {
     const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
     const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
     const tkResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
+    const fbResult: PublishResult = { status: 'skipped', platform: 'Facebook' };
     
     await requestIndexing(absoluteUrl);
 
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
         instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
         twitterUrl: xResult.status === 'success' ? xResult.url : undefined,
         tiktokUrl: tkResult.status === 'success' ? tkResult.url : undefined,
+        facebookUrl: fbResult.status === 'success' ? fbResult.url : undefined,
       });
     }
 
@@ -69,6 +71,7 @@ export async function GET(request: Request) {
         instagram: igResult.status === 'success',
         twitter: xResult.status === 'success',
         tiktok: tkResult.status === 'success',
+        facebook: fbResult.status === 'success',
       }
     });
 

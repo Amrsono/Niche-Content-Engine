@@ -16,16 +16,29 @@ interface PageProps {
 }
 
 function getAuthorizedImageUrl(url: string | undefined, title: string): string {
-  const defaultOgImage = `https://gen.pollinations.ai/image/${encodeURIComponent(title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux&key=pk_31oNBvU9JLA1ApNX`;
-  let finalUrl = url || defaultOgImage;
+  const defaultOgImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(title + ' digital art cinematic')}?width=1200&height=630&nologo=true&enhance=true&model=flux`;
+  
+  // DEEP RESILIENCE: Detect and reject known broken or deprecated URL patterns
+  const isDeprecated = (u: string | undefined) => {
+    if (!u) return true;
+    if (u.includes('pollinations.ai/p/')) return true;    // Avoid HTML GUI
+    if (u.includes('gen.pollinations.ai')) return true;   // Deprecated API key endpoint
+    if (u.includes('rebrand.ly')) return true;            // Legacy shortener
+    if (u.includes('unsplash.com')) return true;          // Old placeholders
+    if (u.includes('%22')) return true;                   // Legacy double-quoting issues
+    return false;
+  };
+
+  let finalUrl = isDeprecated(url) ? defaultOgImage : url!;
   
   // If it's already a proxy URL, let the proxy handle the authorization.
   if (finalUrl.includes('/api/image-proxy')) {
     return finalUrl;
   }
   
-  if (finalUrl.includes('pollinations.ai') && !finalUrl.includes('key=')) {
-    finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'key=pk_31oNBvU9JLA1ApNX';
+  if (finalUrl.includes('pollinations.ai') && finalUrl.includes('key=')) {
+    // We actively strip the old broken key 
+    finalUrl = finalUrl.replace(/&key=[^&]*/, '').replace(/\?key=[^&]*&/, '?').replace(/\?key=[^&]*$/, '');
   }
   
   return finalUrl;
@@ -47,7 +60,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const authImageUrl = getAuthorizedImageUrl(post.ogImageUrl, post.title);
   
   // ALWAYS route through PROXY for absolute compatibility with Facebook/Instagram scrapers
-  const shareImage = authImageUrl.includes('/api/image-proxy') 
+  // Check if it's already proxed (e.g. from the generator) to avoid double-proxy loops
+  const shareImage = authImageUrl.startsWith('/api/image-proxy') || authImageUrl.includes('%2Fapi%2Fimage-proxy')
     ? authImageUrl 
     : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(authImageUrl)}`;
 
@@ -116,7 +130,7 @@ export default async function PostReader({ params }: PageProps) {
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
   const authImageUrl = getAuthorizedImageUrl(post.ogImageUrl, post.title);
   
-  const shareImage = authImageUrl.includes('/api/image-proxy') 
+  const shareImage = authImageUrl.startsWith('/api/image-proxy') || authImageUrl.includes('%2Fapi%2Fimage-proxy')
     ? authImageUrl 
     : `${siteUrl}/api/image-proxy?url=${encodeURIComponent(authImageUrl)}`;
 
@@ -160,7 +174,7 @@ export default async function PostReader({ params }: PageProps) {
 
             <div className={styles.featuredImageArea}>
               <ArticleImage 
-                initialSrc={authImageUrl}
+                initialSrc={shareImage}
                 alt={post.title}
                 title={post.title}
               />

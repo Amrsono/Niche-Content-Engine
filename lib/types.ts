@@ -12,6 +12,7 @@ export interface Post {
   instagramUrl?: string;
   twitterUrl?: string;
   tiktokUrl?: string;
+  facebookUrl?: string;
   views?: number;
   adClicks?: number;
 }

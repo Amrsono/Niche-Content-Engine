@@ -214,19 +214,60 @@ async function generateHashtags(title: string, content: string): Promise<string>
       messages: [
         {
           role: "system",
-          content: "You are a social media growth expert. Generate 5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces."
+          content: "You are a social media growth expert. Generate 3-5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces."
         },
         {
           role: "user",
           content: `Title: ${title}\nContent: ${content.substring(0, 500)}...`
         }
       ],
-      model: DISCOVERY_MODEL
+      model: FAST_MODEL
     });
     return chatCompletion.choices[0].message.content?.trim() || "#niche #pulse2026 #contentengine";
   } catch (err) {
     console.warn("[SOCIAL] Hashtag generation failed, using fallbacks.");
     return "#niche #pulse2026 #contentengine";
+  }
+}
+
+/**
+ * Generates a platform-optimized social media caption.
+ */
+async function generateSocialCaption(platform: 'instagram' | 'twitter' | 'tiktok' | 'facebook', title: string, content: string, blogUrl?: string): Promise<string> {
+  const hashtags = await generateHashtags(title, content);
+  const platformPrompts = {
+    instagram: "Create a world-class Instagram caption. Start with a 'thumb-stopping' hook. Use bullet points for value. End with a clear 'Link in Bio' CTA. Use relevant emojis. Be trendy and punchy.",
+    twitter: "Create a high-engagement X (Twitter) post. Start with a viral-style hook. Include the link naturally. Be concise and sharp. Use 1-2 emojis max. Ensure it reads like a tech-savvy thought leader.",
+    tiktok: "Create a high-energy TikTok description. Rapid-fire hooks. Bullet points of 'what you'll learn'. Clear 'Link in Bio' CTA. Lots of energy and emojis.",
+    facebook: "Create a compelling Facebook Page post. Focus on community engagement and storytelling. Use a strong headline hook. Use relevant emojis. End with a clear CTA to check the link. Professional yet approachable."
+  };
+
+  try {
+    const chatCompletion = await callGroq({
+      messages: [
+        {
+          role: "system",
+          content: `${platformPrompts[platform]} Return ONLY the caption text. Do NOT include placeholders like [Link Here]. For Instagram and TikTok, emphasize the BIO for the link. For Twitter, the link provided is ${blogUrl || 'your website'}.`
+        },
+        {
+          role: "user",
+          content: `Article Title: ${title}\nSummary: ${content.substring(0, 400)}...\nURL: ${blogUrl || 'Link in Bio'}`
+        }
+      ],
+      model: FAST_MODEL
+    });
+
+    let caption = chatCompletion.choices[0].message.content?.trim() || `${title}\n\n${content.substring(0, 100)}...`;
+    
+    // Append hashtags if not already included by the AI
+    if (!caption.includes('#')) {
+      caption += `\n\n${hashtags}`;
+    }
+
+    return caption;
+  } catch (err) {
+    console.warn(`[SOCIAL] Caption generation failed for ${platform}, using fallback.`);
+    return `${title}\n\n🔗 ${blogUrl || 'Link in Bio'}\n\n${hashtags}`;
   }
 }
 
@@ -511,10 +552,10 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     console.log(`[SEO] Falling back to Pollinations. Unique seed: ${uniqueSeed}`);
     
     // Use a default public key if one isn't provided in the environment
-    const pollKey = process.env.POLLINATIONS_API_KEY || 'pk_31oNBvU9JLA1ApNX';
+    const pollKey = process.env.POLLINATIONS_API_KEY || ''; // Not needed for the free prompt endpoint
     
     // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
-    const fallbackUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux&key=${pollKey}`;
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux`;
     
     try {
       console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
@@ -527,7 +568,7 @@ Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make
     return fallbackUrl;
   } catch (err: any) {
     console.warn(`[SEO ERROR] Image generation failed:`, err.message || err);
-    const errorFallback = `https://gen.pollinations.ai/image/${encodeURIComponent(title)}?width=1200&height=630&nologo=true&model=flux`;
+    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}?width=1200&height=630&nologo=true&model=flux`;
     try { await fetch(errorFallback); } catch (e) {}
     return errorFallback;
   }
@@ -608,20 +649,10 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
   try {
     console.log(`[SOCIAL] Creating Instagram media container for: ${article.title}`);
     
-    // Step 1: Generate Dynamic Hashtags
-    const hashtags = await generateHashtags(article.title, article.content);
+    // Step 1: Generate AI-Optimized Caption
+    const caption = await generateSocialCaption('instagram', article.title, article.content, blogUrl);
     
     // Step 2: Create Media Container
-    // Caption includes the title, meta, link (textual) and dynamic hashtags
-    let caption = `${article.title}\n\n${article.metaDescription}`;
-    
-    if (blogUrl) {
-      caption += `\n\n🔗 Read More: ${blogUrl}\n👉 Link in Bio for more pulses!`;
-    } else {
-      caption += `\n\n👉 Link in Bio for more pulses!`;
-    }
-    
-    caption += `\n\n${hashtags}`;
     
     // Normalize image URL: Instagram requires the URL to resolve to a JPEG.
     // Pollinations URLs need a .jpg extension before the query string.
@@ -644,7 +675,11 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
     }
 
     // Move access_token to Query String for maximum reliability
-    const containerRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`, {
+    const url = `https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`;
+    console.log(`[INSTAGRAM DEBUG] Request URL: ${url}`);
+    console.log(`[INSTAGRAM DEBUG] Payload:`, JSON.stringify({ image_url: imageUrl, caption: caption }, null, 2));
+
+    const containerRes = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -774,26 +809,14 @@ export async function publishToTwitter(article: DraftArticle, blogUrl?: string):
   try {
     console.log(`[SOCIAL] Composing tweet for: ${article.title}`);
 
-    // Step 1: Generate Dynamic Hashtags
-    const hashtags = await generateHashtags(article.title, article.content);
+    // Step 1: Generate AI-Optimized Caption
+    let tweetText = await generateSocialCaption('twitter', article.title, article.content, blogUrl);
 
-    // Step 2: Compose the tweet (280 char limit)
-    const link = blogUrl || '';
-    const titleTruncated = article.title.length > 120 ? article.title.substring(0, 117) + '...' : article.title;
-    const metaSnippet = article.metaDescription.length > 80 ? article.metaDescription.substring(0, 77) + '...' : article.metaDescription;
-    
-    let tweetText = `🚀 ${titleTruncated}\n\n${metaSnippet}`;
-    if (link) tweetText += `\n\n🔗 ${link}`;
-    tweetText += `\n\n${hashtags}`;
-
-    // Ensure under 280 chars
+    // Step 2: Ensure under 280 chars (aggressive truncation for X)
     if (tweetText.length > 280) {
-      // Try to preserve the link and hashtags, truncate the text/meta
-      const reservedLength = (link ? link.length + 5 : 0) + hashtags.length + 5; 
-      const available = 280 - reservedLength;
-      tweetText = `🚀 ${titleTruncated.substring(0, available / 2)}\n\n${metaSnippet.substring(0, available / 2)}...`;
-      if (link) tweetText += `\n\n🔗 ${link}`;
-      tweetText += `\n\n${hashtags}`;
+      console.log(`[SOCIAL] Tweet too long (${tweetText.length} chars). Truncating...`);
+      // Keep first 250 chars and ensure link is visible if present
+      tweetText = tweetText.substring(0, 277) + "...";
     }
 
     // Twitter API v2 endpoint
@@ -858,13 +881,8 @@ export async function publishToTikTok(article: DraftArticle, blogUrl?: string): 
   try {
     console.log(`[SOCIAL] Initializing TikTok Direct Post for: ${article.title}`);
     
-    // Step 1: Generate Dynamic Hashtags
-    const hashtags = await generateHashtags(article.title, article.content);
-    
-    // Step 2: Compose Caption
-    let caption = `${article.title}\n\n${article.metaDescription}`;
-    if (blogUrl) caption += `\n\n🔗 Full Pulse: ${blogUrl}`;
-    caption += `\n\n${hashtags}`;
+    // Step 1: Generate AI-Optimized Caption
+    const caption = await generateSocialCaption('tiktok', article.title, article.content, blogUrl);
 
     // TikTok Direct Post V2 - Photos via URL
     // Note: char limit is 2,200 but line breaks might be ignored by some TikTok clients
@@ -911,6 +929,72 @@ export async function publishToTikTok(article: DraftArticle, blogUrl?: string): 
   } catch (error: any) {
     console.error(`[SOCIAL ERROR] TikTok failed: ${error.message}`);
     return { status: "error", message: error.message, platform: "TikTok" };
+  }
+}
+
+export async function publishToFacebook(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
+  const pageId = process.env.FACEBOOK_PAGE_ID || '61578555009232';
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim();
+
+  if (!pageId || !token) {
+    console.warn(`[SOCIAL WARNING] Facebook Page credentials missing. Skipping post.`);
+    return { 
+      status: "skipped", 
+      message: "Facebook credentials missing. Add FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN to .env.local", 
+      platform: "Facebook" 
+    };
+  }
+
+  try {
+    console.log(`[SOCIAL] Composing Facebook post for: ${article.title}`);
+    
+    // Step 1: Generate AI-Optimized Caption
+    const caption = await generateSocialCaption('facebook', article.title, article.content, blogUrl);
+
+    // Facebook Graph API - Posting to Page Feed
+    // We post a "Link" post which naturally pulls the OG metadata (image, title, desc)
+    const url = `https://graph.facebook.com/v20.0/${pageId}/feed`;
+    const payload = {
+      message: caption,
+      link: blogUrl,
+      access_token: token
+    };
+    
+    console.log(`[FACEBOOK DEBUG] Request URL: ${url}`);
+    console.log(`[FACEBOOK DEBUG] Payload:`, JSON.stringify({ ...payload, access_token: 'HIDDEN' }, null, 2));
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    
+    if (!res.ok || data.error) {
+       console.error('[FACEBOOK ERROR]', JSON.stringify(data, null, 2));
+       throw new Error(data.error?.message || `Facebook API Error: Failed to post to page.`);
+    }
+
+    // Facebook returns an ID formatted as {page_id}_{post_id}
+    const postId = data.id;
+    console.log(`[SOCIAL] ✅ Facebook Post ID: ${postId}`);
+
+    // Permalink structure: https://facebook.com/{page_id}/posts/{short_post_id}
+    const shortPostId = postId.split('_')[1] || postId;
+    const finalUrl = `https://www.facebook.com/${pageId}/posts/${shortPostId}`;
+
+    return { 
+      status: "success", 
+      url: finalUrl, 
+      id: postId,
+      platform: "Facebook" 
+    };
+  } catch (error: any) {
+    console.error(`[SOCIAL ERROR] Facebook failed: ${error.message}`);
+    return { status: "error", message: error.message, platform: "Facebook" };
   }
 }
 

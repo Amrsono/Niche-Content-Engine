@@ -240,11 +240,10 @@
   .header p {
     font-size: 1rem;
   }
-  
+
   .postGrid {
     grid-template-columns: 1fr;
   }
-  
   .readerContainer {
     padding: 100px 16px 60px;
   }
@@ -358,4 +357,52 @@
   padding: 4px 8px;
   border-radius: 6px;
   text-transform: uppercase;
+}
+
+.signalButton {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  padding: 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.signalButton:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.signalButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.socialIconActive {
+  color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.socialIconActive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.loadingIcon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
