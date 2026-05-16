@@ -642,8 +642,16 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
 
 
   if (!businessId || !token) {
-    console.warn(`[SOCIAL WARNING] Instagram credentials missing. Skipping real post.`);
-    return { status: "skipped", message: "Instagram credentials missing", platform: "Instagram" };
+    const missing = [];
+    if (!businessId) missing.push("INSTAGRAM_BUSINESS_ACCOUNT_ID");
+    if (!token) missing.push("INSTAGRAM_ACCESS_TOKEN");
+    
+    console.warn(`[SOCIAL WARNING] Instagram credentials missing (${missing.join(', ')}). Skipping real post.`);
+    return { 
+      status: "skipped", 
+      message: `Instagram credentials missing: ${missing.join(', ')}. Add them to .env.local`, 
+      platform: "Instagram" 
+    };
   }
 
   try {
@@ -934,13 +942,18 @@ export async function publishToTikTok(article: DraftArticle, blogUrl?: string): 
 
 export async function publishToFacebook(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
   const pageId = process.env.FACEBOOK_PAGE_ID || '61578555009232';
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim();
+  // Aggressive sanitization: remove any invisible characters, quotes, or spaces
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
 
   if (!pageId || !token) {
-    console.warn(`[SOCIAL WARNING] Facebook Page credentials missing. Skipping post.`);
+    const missing = [];
+    if (!pageId) missing.push("FACEBOOK_PAGE_ID");
+    if (!token) missing.push("FACEBOOK_PAGE_ACCESS_TOKEN");
+
+    console.warn(`[SOCIAL WARNING] Facebook Page credentials missing (${missing.join(', ')}). Skipping post.`);
     return { 
       status: "skipped", 
-      message: "Facebook credentials missing. Add FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN to .env.local", 
+      message: `Facebook credentials missing: ${missing.join(', ')}. Add them to .env.local`, 
       platform: "Facebook" 
     };
   }
