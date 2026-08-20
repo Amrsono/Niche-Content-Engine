@@ -1,7 +1,9 @@
 "use client";
 
-import styles from './AdStyles.module.css';
+import React from 'react';
 import Image from 'next/image';
+import { BaseAd } from './BaseAd';
+import styles from './AdStyles.module.css';
 
 export default function AmazonAdBanner() {
   const productLink = "https://amzn.to/4t3Kx2M";
@@ -9,9 +11,7 @@ export default function AmazonAdBanner() {
   const productImage = "/ads/tplink_extender_ad.png";
 
   return (
-    <div className={styles.adWrapper}>
-      <span className={styles.adLabel}>Partner Offer</span>
-      
+    <BaseAd variant="banner" label="Partner Offer">
       <a 
         href={productLink} 
         target="_blank" 
@@ -39,6 +39,6 @@ export default function AmazonAdBanner() {
           </div>
         </div>
       </a>
-    </div>
+    </BaseAd>
   );
 }
