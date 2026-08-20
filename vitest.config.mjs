@@ -13,5 +13,32 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './'),
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: [
+        'lib/**/*.ts',
+        'app/api/**/*.ts',
+        'app/hooks/**/*.ts',
+        'app/components/AdminGuard.tsx',
+        'app/components/IndexingStatusCard.tsx',
+        'app/components/FloatingNav.tsx',
+        'app/components/SmartImage.tsx',
+        'app/components/AdSenseDisplay.tsx',
+        'app/components/BentoBox.tsx',
+      ],
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        '**/__mocks__/**',
+        'node_modules/**',
+        '.next/**',
+      ],
+      thresholds: {
+        lines: 70,
+        branches: 55,
+        functions: 70,
+        statements: 70,
+      },
+    },
   },
 });

@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "tmp/**",
     "scratch/**",
+    "coverage/**",
     "*.js",
     "*.mjs",
     "vitest.config.mjs",
