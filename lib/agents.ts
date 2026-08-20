@@ -1,275 +1,15 @@
-import Groq from "groq-sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import OpenAI from "openai";
-import { fetchGoogleTrends, scrapeTikTokTrends } from "./scraper";
-import { savePost, updatePost, getSettings, saveSettings } from "./storage";
-export { updatePost };
+import { fetchGoogleTrends, scrapeTikTokTrends } from './scraper';
+import { savePost, updatePost } from './storage';
+import { logger } from './logger';
+import { env } from './env';
+import { safeJsonParse, cleanResult, stringifyError, delay } from './ai/utils';
+import { callGroqProvider, GROQ_MODELS, type GroqChatParams } from './ai/providers/groq';
+import { callGeminiProvider, GEMINI_MODELS } from './ai/providers/gemini';
+import { callOpenAIProvider, OPENAI_MODELS } from './ai/providers/openai';
+import { getTikTokToken } from './tiktok/token';
+import type OpenAI from 'openai';
 
-// Utility to safely stringify any error object
-function stringifyError(err: any): string {
-  if (!err) return "Unknown Error";
-  if (typeof err === 'string') return err;
-  if (err.message) return err.message;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
-}
-
-/**
- * Safely parses JSON from AI responses that might contain markdown or text noise.
- */
-function safeJsonParse(content: string, context: string): any {
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const cleanContent = jsonMatch ? jsonMatch[0] : content;
-    return JSON.parse(cleanContent);
-  } catch (err) {
-    console.error(`[AI JSON ERROR] Failed to parse ${context}.`);
-    console.error(`[RAW CONTENT SNIPPET]: ${content.substring(0, 200)}...`);
-    throw new Error(`Invalid JSON response from AI while processing ${context}.`);
-  }
-}
-
-/**
- * Strips markdown code blocks and extraneous whitespace from AI text responses.
- */
-function cleanResult(content: string): string {
-  if (!content) return "";
-  return content
-    .replace(/^```[a-z]*\n/gi, "")
-    .replace(/```$/g, "")
-    .trim()
-    .replace(/^"+|"+$/g, ""); // Strip leading/trailing double quotes
-}
-
-async function getTikTokToken() {
-  const auth = await getSettings('tiktok_auth');
-  if (!auth) return null;
-
-  const now = Date.now();
-  // Buffer of 5 minutes before actual expiration
-  if (now < (auth.expires_at - 300000)) {
-    return auth.access_token;
-  }
-
-  // Token expired or near expiration, try refresh
-  console.log(`[TIKTOK] 🔄 Token expired. Refreshing...`);
-  const clientKey = process.env.TIKTOK_CLIENT_KEY;
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
-
-  try {
-    const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cache-Control': 'no-cache'
-      },
-      body: new URLSearchParams({
-        client_key: clientKey || '',
-        client_secret: clientSecret || '',
-        grant_type: 'refresh_token',
-        refresh_token: auth.refresh_token
-      })
-    });
-
-    const data = await res.json();
-    if (data.access_token) {
-      const newAuth = {
-        ...auth,
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: Date.now() + (data.expires_in * 1000),
-        refresh_expires_at: Date.now() + (data.refresh_expires_in * 1000),
-        updated_at: new Date().toISOString()
-      };
-      await saveSettings('tiktok_auth', newAuth);
-      console.log(`[TIKTOK] ✅ Token refreshed successfully.`);
-      return data.access_token;
-    } else {
-      console.error('[TIKTOK REFRESH ERROR]', JSON.stringify(data, null, 2));
-      return null;
-    }
-  } catch (error) {
-    console.error('[TIKTOK REFRESH FETCH ERROR]', error);
-    return null;
-  }
-}
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-function getAI() {
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
-  return { groq, genAI, openai };
-}
-
-// Models
-const DISCOVERY_MODEL = "llama-3.3-70b-versatile";
-const REASONING_MODEL = "llama-3.3-70b-versatile";
-const FAST_MODEL = "llama-3.1-8b-instant"; // For small tasks
-const FALLBACK_MODEL = "gemini-2.0-flash";
-
-// Global Provider Cooldowns
-const providerCooldowns: Record<string, number> = {
-  groq: 0,
-  gemini: 0,
-  openai: 0
-};
-
-const COOLDOWN_DURATION = 60000; // 60 seconds
-
-// Global Fallback Helper with Exponential Backoff and Cooldowns
-async function callGroq(options: any): Promise<any> {
-  const { groq, genAI, openai } = getAI();
-  
-  // Model selection: Use faster model for small tasks if possible
-  const isSimpleTask = options.messages.some((m: any) => 
-    m.content?.toLowerCase().includes("hashtag") || 
-    m.content?.toLowerCase().includes("meta description")
-  );
-
-  if (isSimpleTask && options.model === DISCOVERY_MODEL) {
-    options.model = FAST_MODEL;
-    console.log(`[AI] Using FAST_MODEL (${FAST_MODEL}) for simple task.`);
-  }
-
-  const MAX_TRIES = 2;
-  let attempt = 0;
-
-  while (attempt < MAX_TRIES) {
-    try {
-      // 1. Try Groq (Primary) - Only if not cooling down
-      if (Date.now() > providerCooldowns.groq) {
-        return await groq.chat.completions.create(options);
-      } else {
-        console.warn(`[AI] Groq is cooling down. Skipping to fallback...`);
-        throw { status: 429 }; // Force fallback
-      }
-    } catch (e: any) {
-      if (e.status === 429) {
-        providerCooldowns.groq = Date.now() + COOLDOWN_DURATION;
-        attempt++;
-        if (attempt < MAX_TRIES) {
-          const waitTime = 15000 * attempt; // 15s then 30s
-          console.warn(`[AI 429] Groq rate limited. Retrying in ${waitTime/1000}s... (Attempt ${attempt}/${MAX_TRIES})`);
-          await delay(waitTime);
-          continue;
-        }
-        
-        console.warn(`[AI FALLBACK] Groq exhausted. Switching to Gemini...`);
-        
-        // 2. Try Gemini (Secondary)
-        if (Date.now() > providerCooldowns.gemini) {
-          try {
-            const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-            const prompt = options.messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-            const result = await model.generateContent({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-            });
-            const text = result.response.text();
-            return { choices: [{ message: { content: text } }] };
-          } catch (gemError: any) {
-            console.error("[GEMINI ERROR]", stringifyError(gemError));
-            const isGemQuota = gemError.message?.includes('429') || gemError.status === 429 || gemError.message?.includes('quota');
-            if (isGemQuota) {
-              providerCooldowns.gemini = Date.now() + COOLDOWN_DURATION;
-              
-              if (process.env.OPENAI_API_KEY && Date.now() > providerCooldowns.openai) {
-                console.warn(`[AI FALLBACK] Gemini Quota also hit. Cooling down (15s) for OpenAI...`);
-                await delay(15000);
-                
-                // 3. Try OpenAI (Tertiary)
-                try {
-                  return await openai.chat.completions.create({
-                    ...options,
-                    model: "gpt-4o-mini"
-                  });
-                } catch (oaError: any) {
-                  providerCooldowns.openai = Date.now() + COOLDOWN_DURATION;
-                  console.error("[OPENAI ERROR]", stringifyError(oaError));
-                  throw new Error(`CRITICAL: All providers exhausted. Latest error: ${stringifyError(oaError)}`);
-                }
-              }
-            }
-            throw gemError;
-          }
-        }
-      }
-      throw e;
-    }
-  }
-
-  throw new Error("AI call failed to return a valid response after all retries and fallbacks.");
-}
-
-/**
- * Generates 3-5 high-engagement hashtags based on article content.
- */
-async function generateHashtags(title: string, content: string): Promise<string> {
-  try {
-    const chatCompletion = await callGroq({
-      messages: [
-        {
-          role: "system",
-          content: "You are a social media growth expert. Generate 3-5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces."
-        },
-        {
-          role: "user",
-          content: `Title: ${title}\nContent: ${content.substring(0, 500)}...`
-        }
-      ],
-      model: FAST_MODEL
-    });
-    return chatCompletion.choices[0].message.content?.trim() || "#niche #pulse2026 #contentengine";
-  } catch (err) {
-    console.warn("[SOCIAL] Hashtag generation failed, using fallbacks.");
-    return "#niche #pulse2026 #contentengine";
-  }
-}
-
-/**
- * Generates a platform-optimized social media caption.
- */
-async function generateSocialCaption(platform: 'instagram' | 'twitter' | 'tiktok' | 'facebook', title: string, content: string, blogUrl?: string): Promise<string> {
-  const hashtags = await generateHashtags(title, content);
-  const platformPrompts = {
-    instagram: "Create a world-class Instagram caption. Start with a 'thumb-stopping' hook. Use bullet points for value. End with a clear 'Link in Bio' CTA. Use relevant emojis. Be trendy and punchy.",
-    twitter: "Create a high-engagement X (Twitter) post. Start with a viral-style hook. Include the link naturally. Be concise and sharp. Use 1-2 emojis max. Ensure it reads like a tech-savvy thought leader.",
-    tiktok: "Create a high-energy TikTok description. Rapid-fire hooks. Bullet points of 'what you'll learn'. Clear 'Link in Bio' CTA. Lots of energy and emojis.",
-    facebook: "Create a compelling Facebook Page post. Focus on community engagement and storytelling. Use a strong headline hook. Use relevant emojis. End with a clear CTA to check the link. Professional yet approachable."
-  };
-
-  try {
-    const chatCompletion = await callGroq({
-      messages: [
-        {
-          role: "system",
-          content: `${platformPrompts[platform]} Return ONLY the caption text. Do NOT include placeholders like [Link Here]. For Instagram and TikTok, emphasize the BIO for the link. For Twitter, the link provided is ${blogUrl || 'your website'}.`
-        },
-        {
-          role: "user",
-          content: `Article Title: ${title}\nSummary: ${content.substring(0, 400)}...\nURL: ${blogUrl || 'Link in Bio'}`
-        }
-      ],
-      model: FAST_MODEL
-    });
-
-    let caption = chatCompletion.choices[0].message.content?.trim() || `${title}\n\n${content.substring(0, 100)}...`;
-    
-    // Append hashtags if not already included by the AI
-    if (!caption.includes('#')) {
-      caption += `\n\n${hashtags}`;
-    }
-
-    return caption;
-  } catch (err) {
-    console.warn(`[SOCIAL] Caption generation failed for ${platform}, using fallback.`);
-    return `${title}\n\n🔗 ${blogUrl || 'Link in Bio'}\n\n${hashtags}`;
-  }
-}
+export { updatePost, safeJsonParse, cleanResult, stringifyError, getTikTokToken };
 
 export interface TrendData {
   keyword: string;
@@ -286,489 +26,484 @@ export interface DraftArticle {
 }
 
 export interface PublishResult {
-  status: "success" | "error" | "skipped";
+  status: 'success' | 'error' | 'skipped';
   url?: string;
   platform: string;
   id?: string;
   message?: string;
 }
 
-// 1. Discovery Agent (Now with Real-time Scraping)
-export async function runTrendScraper(niche: string): Promise<TrendData[]> {
-  console.log(`[DISCOVERY] Starting real-time scrape for niche: ${niche}`);
-  
+// Global Provider Cooldowns
+const providerCooldowns: Record<string, number> = {
+  groq: 0,
+  gemini: 0,
+  openai: 0,
+};
+
+const COOLDOWN_DURATION = 60000; // 60 seconds
+
+/**
+ * Universal Multi-Provider AI Fallback Dispatcher
+ */
+export async function callAIWithFallback(
+  options: GroqChatParams
+): Promise<{ text: string }> {
+  // 1. Model selection: Fast model for simple tasks
+  const isSimpleTask = (options.messages || []).some((m: { content?: unknown }) => {
+    const c = typeof m.content === 'string' ? m.content.toLowerCase() : '';
+    return c.includes('hashtag') || c.includes('meta description');
+  });
+
+  if (isSimpleTask && options.model === GROQ_MODELS.DISCOVERY) {
+    options.model = GROQ_MODELS.FAST;
+    logger.debug(`Using FAST_MODEL (${GROQ_MODELS.FAST}) for simple task`, 'AI');
+  }
+
+  const MAX_TRIES = 2;
+  let attempt = 0;
+
+  while (attempt < MAX_TRIES) {
+    try {
+      // 1. Try Groq (Primary)
+      if (Date.now() > providerCooldowns.groq && (env.GROQ_API_KEY || process.env.GROQ_API_KEY)) {
+        const response = await callGroqProvider(options);
+        const text = response.choices[0]?.message?.content || '';
+        return { text };
+      } else {
+        logger.warn('Groq unavailable or cooling down. Falling back to Gemini...', 'AI');
+        throw { status: 429 };
+      }
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 429) {
+        providerCooldowns.groq = Date.now() + COOLDOWN_DURATION;
+        attempt++;
+        if (attempt < MAX_TRIES) {
+          const waitTime = 15000 * attempt;
+          logger.warn(`Groq rate limited. Retrying in ${waitTime / 1000}s (Attempt ${attempt}/${MAX_TRIES})`, 'AI');
+          await delay(waitTime);
+          continue;
+        }
+
+        // 2. Try Gemini (Secondary)
+        if (Date.now() > providerCooldowns.gemini && (env.GEMINI_API_KEY || process.env.GEMINI_API_KEY)) {
+          try {
+            logger.info('Calling secondary fallback provider: Gemini...', 'AI');
+            const prompt = (options.messages || [])
+              .map((m: { role?: string; content?: unknown }) => `${m.role || 'user'}: ${String(m.content || '')}`)
+              .join('\n');
+            const text = await callGeminiProvider(prompt, GEMINI_MODELS.FLASH);
+            return { text };
+          } catch (gemError: unknown) {
+            logger.error('Gemini fallback failed', 'AI', gemError);
+            providerCooldowns.gemini = Date.now() + COOLDOWN_DURATION;
+
+            // 3. Try OpenAI (Tertiary)
+            if (Date.now() > providerCooldowns.openai && (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)) {
+              logger.warn('Calling tertiary fallback provider: OpenAI...', 'AI');
+              await delay(2000);
+              try {
+                const oaOptions: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
+                  messages: options.messages as OpenAI.Chat.ChatCompletionMessageParam[],
+                  model: OPENAI_MODELS.MINI,
+                };
+                const oaRes = await callOpenAIProvider(oaOptions);
+                const text = oaRes.choices[0]?.message?.content || '';
+                return { text };
+              } catch (oaError: unknown) {
+                providerCooldowns.openai = Date.now() + COOLDOWN_DURATION;
+                logger.error('OpenAI fallback failed', 'AI', oaError);
+                throw new Error(`CRITICAL: All AI providers exhausted. Latest error: ${stringifyError(oaError)}`);
+              }
+            }
+          }
+        }
+      }
+      throw new Error(`AI execution failed: ${stringifyError(e)}`);
+    }
+  }
+
+  throw new Error('AI call failed to return a valid response after all retries and fallbacks.');
+}
+
+/**
+ * Generates 3-5 high-engagement hashtags based on article content.
+ */
+export async function generateHashtags(title: string, content: string): Promise<string> {
   try {
-    // A. Fetch Real Data
-    const googleTrends = await fetchGoogleTrends();
-    const tiktokTrends = await scrapeTikTokTrends();
-    
-    const rawData = JSON.stringify({ 
-      google: googleTrends.slice(0, 5), 
-      tiktok: tiktokTrends 
-    });
-
-    console.log(`[DISCOVERY] Analyzing ${googleTrends.length + tiktokTrends.length} raw signals...`);
-
-    const chatCompletion = await callGroq({
+    const res = await callAIWithFallback({
       messages: [
         {
-          role: "system",
-          content: "You are an expert SEO analyst. I will provide raw trending data. Pick the top 3 high-growth, low-competition keywords for a blog in JSON format."
+          role: 'system',
+          content: 'You are a social media growth expert. Generate 3-5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces.',
         },
         {
-          role: "user",
-          content: `Niche: "${niche}". Raw Data: ${rawData}. Return JSON with 'trends' (keyword, searchVolume, competition: LOW/MEDIUM/HIGH).`
-        }
+          role: 'user',
+          content: `Title: ${title}\nContent: ${content.substring(0, 500)}...`,
+        },
       ],
-      model: DISCOVERY_MODEL,
-      response_format: { type: "json_object" }
+      model: GROQ_MODELS.FAST,
+    });
+    return res.text.trim() || '#niche #pulse2026 #contentengine';
+  } catch (err) {
+    logger.warn('Hashtag generation failed, using default tags', 'SOCIAL', err);
+    return '#niche #pulse2026 #contentengine';
+  }
+}
+
+/**
+ * Generates a platform-optimized social media caption.
+ */
+export async function generateSocialCaption(
+  platform: 'instagram' | 'twitter' | 'tiktok' | 'facebook',
+  title: string,
+  content: string,
+  blogUrl?: string
+): Promise<string> {
+  const hashtags = await generateHashtags(title, content);
+  const platformPrompts: Record<string, string> = {
+    instagram: "Create a world-class Instagram caption. Start with a 'thumb-stopping' hook. Use bullet points for value. End with a clear 'Link in Bio' CTA. Use relevant emojis.",
+    twitter: 'Create a high-engagement X (Twitter) post. Start with a viral-style hook. Include the link naturally. Be concise and sharp. Use 1-2 emojis max.',
+    tiktok: "Create a high-energy TikTok description. Rapid-fire hooks. Bullet points of 'what you'll learn'. Clear 'Link in Bio' CTA. Lots of energy and emojis.",
+    facebook: 'Create a compelling Facebook Page post. Focus on community engagement and storytelling. Use a strong headline hook. Use relevant emojis. End with a clear CTA.',
+  };
+
+  try {
+    const res = await callAIWithFallback({
+      messages: [
+        {
+          role: 'system',
+          content: `${platformPrompts[platform]} Return ONLY the caption text. Do NOT include placeholders like [Link Here]. For Instagram and TikTok, emphasize the BIO for the link. For Twitter, the link provided is ${blogUrl || 'your website'}.`,
+        },
+        {
+          role: 'user',
+          content: `Article Title: ${title}\nSummary: ${content.substring(0, 400)}...\nURL: ${blogUrl || 'Link in Bio'}`,
+        },
+      ],
+      model: GROQ_MODELS.FAST,
     });
 
-    const content = chatCompletion.choices[0].message.content || "{}";
-    const data = safeJsonParse(content, 'Trend Scraper');
-    return (data.trends || []).map((t: any) => ({ ...t, niche }));
-  } catch (err: any) {
-    console.error("[DISCOVERY ERROR]", err);
+    let caption = res.text.trim() || `${title}\n\n${content.substring(0, 100)}...`;
+    if (!caption.includes('#')) {
+      caption += `\n\n${hashtags}`;
+    }
+    return caption;
+  } catch (err) {
+    logger.warn(`Caption generation failed for ${platform}, using fallback.`, 'SOCIAL', err);
+    return `${title}\n\n🔗 ${blogUrl || 'Link in Bio'}\n\n${hashtags}`;
+  }
+}
+
+// 1. Discovery Agent
+export async function runTrendScraper(niche: string): Promise<TrendData[]> {
+  logger.info(`Starting real-time scrape for niche: ${niche}`, 'DISCOVERY');
+  try {
+    const googleTrends = await fetchGoogleTrends();
+    const tiktokTrends = await scrapeTikTokTrends();
+    const rawData = JSON.stringify({
+      google: googleTrends.slice(0, 5),
+      tiktok: tiktokTrends,
+    });
+
+    const res = await callAIWithFallback({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert SEO analyst. I will provide raw trending data. Pick the top 3 high-growth, low-competition keywords for a blog in JSON format.',
+        },
+        {
+          role: 'user',
+          content: `Niche: "${niche}". Raw Data: ${rawData}. Return JSON with 'trends' (keyword, searchVolume, competition: LOW/MEDIUM/HIGH).`,
+        },
+      ],
+      model: GROQ_MODELS.DISCOVERY,
+      response_format: { type: 'json_object' },
+    });
+
+    const data = safeJsonParse<{ trends: TrendData[] }>(res.text, 'Trend Scraper');
+    return (data.trends || []).map((t) => ({ ...t, niche }));
+  } catch (err: unknown) {
+    logger.error('Real-time Discovery failed', 'DISCOVERY', err);
     throw new Error(`Real-time Discovery failed: ${stringifyError(err)}`);
   }
 }
 
-// Helper to find REAL affiliate products based on niche/keyword
+// Helper to find affiliate products
 async function findAffiliateProducts(keyword: string) {
   const isAI = keyword.toLowerCase().includes('ai') || keyword.toLowerCase().includes('productivity');
-  
-  const affiliateTag = process.env.AFFILIATE_TAG || "niche-engine-20";
-  
+  const affiliateTag = env.AFFILIATE_TAG || 'niche-engine-20';
+
   if (isAI) {
     return [
-      { name: "Jasper AI", url: `https://jasper.ai?utm_source=${affiliateTag}`, price: "from $39/mo" },
-      { name: "Notion AI", url: `https://notion.so/product/ai?tag=${affiliateTag}`, price: "$10/mo" },
-      { name: "Synthesia AI Video", url: `https://synthesia.io?ref=${affiliateTag}`, price: "from $22/mo" }
-    ];
-  } else {
-    return [
-      { name: "ecobee Smart Thermostat Premium", url: `https://amazon.com/dp/ecobee?tag=${affiliateTag}`, price: "$249.99" },
-      { name: "Anker SOLIX PS200 Solar Panel", url: `https://amazon.com/dp/anker-solix?tag=${affiliateTag}`, price: "$499.00" },
-      { name: "Fairphone 5 (Sustainable Edition)", url: `https://fairphone.com/en/?ref=${affiliateTag}`, price: "€699.00" }
+      { name: 'Jasper AI', url: `https://jasper.ai?utm_source=${affiliateTag}`, price: 'from $39/mo' },
+      { name: 'Notion AI', url: `https://notion.so/product/ai?tag=${affiliateTag}`, price: '$10/mo' },
+      { name: 'Synthesia AI Video', url: `https://synthesia.io?ref=${affiliateTag}`, price: 'from $22/mo' },
     ];
   }
+
+  return [
+    { name: 'ecobee Smart Thermostat Premium', url: `https://amazon.com/dp/ecobee?tag=${affiliateTag}`, price: '$249.99' },
+    { name: 'Anker SOLIX PS200 Solar Panel', url: `https://amazon.com/dp/anker-solix?tag=${affiliateTag}`, price: '$499.00' },
+    { name: 'Fairphone 5 (Sustainable Edition)', url: `https://fairphone.com/en/?ref=${affiliateTag}`, price: '€699.00' },
+  ];
 }
 
 // Multi-Pass Step 1: Generate Outline
-async function generateOutline(keyword: string) {
-  try {
-    const chatCompletion = await callGroq({
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert content strategist. Create a comprehensive outline for a high-quality article. The outline sections must be specific, insightful, and directly relevant to the topic — no generic or filler sections."
-        },
-        {
-          role: "user",
-          content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Focus on quality over quantity. Max 4-5 sections total targeting 1,000 words total.`
-        }
-      ],
-      model: REASONING_MODEL,
-      response_format: { type: "json_object" }
-    });
-    
-    const content = chatCompletion.choices[0].message.content || "{}";
-    const data = safeJsonParse(content, 'Article Outline');
-    return data.sections || [];
-  } catch (err: any) {
-    console.error("[OUTLINE ERROR]", err);
-    throw new Error(`Outline generation failed: ${stringifyError(err)}`);
-  }
+async function generateOutline(keyword: string): Promise<Array<{ title: string; targetWordCount?: number }>> {
+  const res = await callAIWithFallback({
+    messages: [
+      {
+        role: 'system',
+        content: 'You are an expert content strategist. Create a comprehensive outline for a high-quality article. The outline sections must be specific, insightful, and directly relevant to the topic — no generic filler.',
+      },
+      {
+        role: 'user',
+        content: `Create an outline for: "${keyword}". Return JSON with 'sections' array. Focus on quality over quantity. Max 4-5 sections total targeting 1,000 words total.`,
+      },
+    ],
+    model: GROQ_MODELS.REASONING,
+    response_format: { type: 'json_object' },
+  });
+
+  const data = safeJsonParse<{ sections: Array<{ title: string; targetWordCount?: number }> }>(res.text, 'Article Outline');
+  return data.sections || [];
 }
 
 // Multi-Pass Step 2: Generate Individual Section
-async function generateSection(title: string, keyword: string, productContext: string, previousContext: string, targetWords: number) {
-  const chatCompletion = await callGroq({
+async function generateSection(
+  title: string,
+  keyword: string,
+  productContext: string,
+  previousContext: string,
+  targetWords: number
+): Promise<string> {
+  const res = await callAIWithFallback({
     messages: [
       {
-        role: "system",
-          content: `You are a world-class journalist and expert writer. Write a compelling, insightful article section.
-        Focus on original, factual, and genuinely useful content. Tone: confident, conversational, and premium — like Wired or The Verge.
-        NEVER use phrases like "deep dive", "delve into", "in conclusion", "in this article we will", or any other filler.`
+        role: 'system',
+        content: `You are a world-class journalist and expert writer. Write a compelling, insightful article section.
+Focus on original, factual, and genuinely useful content. Tone: confident, conversational, and premium.
+NEVER use phrases like "deep dive", "delve into", "in conclusion", "in this article we will", or filler.`,
       },
       {
-        role: "user",
-        content: `Topic: "${title}" (Context: ${keyword}). 
-        Target: ${targetWords} words.
-        Affiliate Products allowed to mention: ${productContext}.
-        Previous Sections Summary: ${previousContext.substring(0, 1000)}...
-        
-        Write only the HTML content (start with <h2> or <h3>).`
-      }
+        role: 'user',
+        content: `Topic: "${title}" (Context: ${keyword}).
+Target: ${targetWords} words.
+Affiliate Products allowed to mention: ${productContext}.
+Previous Sections Summary: ${previousContext.substring(0, 1000)}...
+Write only the HTML content (start with <h2> or <h3>).`,
+      },
     ],
-    model: REASONING_MODEL
+    model: GROQ_MODELS.REASONING,
   });
-  return cleanResult(chatCompletion.choices[0].message.content || "");
+  return cleanResult(res.text);
 }
 
 // 2. Reasoning Agent (Multi-Pass Coordinator)
 export async function generateArticle(keyword: string): Promise<DraftArticle> {
-  console.log(`[REASONING] Starting 1,000-word Multi-Pass cycle for: '${keyword}'...`);
-  
+  logger.info(`Starting 1,000-word Multi-Pass cycle for: '${keyword}'...`, 'REASONING');
   try {
     const products = await findAffiliateProducts(keyword);
     const productContext = JSON.stringify(products);
-
-    // Step 1: Outline
     const sections = await generateOutline(keyword);
-    console.log(`[REASONING] Outline generated with ${sections.length} sections.`);
 
-    let fullContent = "";
-    let contextSummary = "";
+    let fullContent = '';
+    let contextSummary = '';
 
-    // Step 2 & 3: Section Generation (Merged Passes to reduce API calls)
     for (let i = 0; i < sections.length; i += 2) {
       const currentSections = sections.slice(i, i + 2);
-      const sectionTitles = currentSections.map((s: any) => s.title).join(" AND ");
-      const targetWords = currentSections.reduce((acc: number, s: any) => acc + (s.targetWordCount || 250), 0);
-      
-      console.log(`[REASONING] Drafting merged pass (${i/2 + 1}/${Math.ceil(sections.length/2)}): ${sectionTitles} (~${targetWords} words)...`);
-      
+      const sectionTitles = currentSections.map((s) => s.title).join(' AND ');
+      const targetWords = currentSections.reduce((acc, s) => acc + (s.targetWordCount || 250), 0);
+
+      logger.info(`Drafting merged pass (${i / 2 + 1}/${Math.ceil(sections.length / 2)}): ${sectionTitles}`, 'REASONING');
       const sectionHtml = await generateSection(sectionTitles, keyword, productContext, contextSummary, targetWords);
-      fullContent += sectionHtml + "\n\n";
+      fullContent += sectionHtml + '\n\n';
       contextSummary += ` Completed: ${sectionTitles}.`;
-      
-      // Delay to respect free-tier rate limits
-      await delay(8000); 
+      await delay(4000);
     }
 
-    // Generate Title and Meta Description
-    const metaCompletion = await callGroq({
+    const metaRes = await callAIWithFallback({
       messages: [
         {
-          role: "system",
-          content: `You are a world-class headline writer for premium digital publications like WIRED, The Verge, and TechCrunch.
-
-Your job: write a UNIQUE, CREATIVE, and SPECIFIC article title that:
-- Captures the exact essence of the topic
-- Sparks intense curiosity or provides a clear promise of value
-- Sounds fresh and original — NOT like a textbook or blog template
-- Is punchy, memorable, and uses strong action or power words
-
-NEVER use these banned phrases: "deep dive", "a look at", "comprehensive guide", "everything you need to know", "complete guide", "in-depth", "ultimate guide", "information gain", or any subtitle with "into".
-
-Return JSON with:
-- "title": string (max 70 chars, NO colons unless used creatively)
-- "metaDescription": string (max 160 chars, compelling and SEO-rich)`
+          role: 'system',
+          content: `You are a world-class headline writer for premium publications like WIRED and TechCrunch.
+Write a UNIQUE, CREATIVE, and SPECIFIC article title and meta description.
+Return JSON with: "title" (max 70 chars) and "metaDescription" (max 160 chars).`,
         },
-        { 
-          role: "user", 
-          content: `Write a headline for an article about: "${keyword}". Make it sound like it belongs on the front page of WIRED magazine.` 
-        }
+        {
+          role: 'user',
+          content: `Write a headline for an article about: "${keyword}".`,
+        },
       ],
-      model: DISCOVERY_MODEL,
-      response_format: { type: "json_object" }
+      model: GROQ_MODELS.DISCOVERY,
+      response_format: { type: 'json_object' },
     });
 
-    const metaData = safeJsonParse(metaCompletion.choices[0].message.content || "{}", 'Title and Meta Generation');
-    const dynamicTitle = metaData.title || `${keyword}: A Complete Guide`;
-    const dynamicMeta = metaData.metaDescription || `Explore the latest insights and deep technical analysis on ${keyword} in our comprehensive guide.`;
-
+    const metaData = safeJsonParse<{ title?: string; metaDescription?: string }>(metaRes.text, 'Title and Meta');
     return {
-      title: dynamicTitle,
+      title: metaData.title || `${keyword}: A Complete Guide`,
       content: fullContent,
-      metaDescription: dynamicMeta
+      metaDescription: metaData.metaDescription || `Explore the latest insights and analysis on ${keyword}.`,
     };
-  } catch (err: any) {
-    console.error("[REASONING ERROR]", err);
+  } catch (err: unknown) {
+    logger.error('Multi-Pass Reasoning failed', 'REASONING', err);
     throw new Error(`Multi-Pass Reasoning failed: ${stringifyError(err)}`);
   }
 }
 
-// 3. SEO Auto-Optimizer (DALL-E 3 / Imagen / Pollinations)
+// 3. SEO Auto-Optimizer Image Generator
 export async function generateOgImage(title: string, context?: string): Promise<string> {
-  console.log(`[SEO] Generating AI Image for: ${title}`);
-  
+  logger.info(`Generating AI Image for: ${title}`, 'SEO');
   try {
-    const contextInfo = context ? `Core Concept: ${context}` : "";
-
-    // A. Generate a click-inducing, hyper-specific image prompt using Groq
-    const promptCompletion = await callGroq({
+    const contextInfo = context ? `Core Concept: ${context}` : '';
+    const promptRes = await callAIWithFallback({
       messages: [
         {
-          role: "system",
-          content: `You are a world-class creative director for a viral digital magazine.
-Your ONLY job is to write a single image prompt for an AI image generator that will produce a STUNNING, click-inducing thumbnail.
-
-Rules:
-- The image must be SO specific to this article topic that it could belong to NO other article.
-- It must feel like a premium magazine cover: cinematic lighting, dramatic composition, ultra-high detail.
-- Choose ONE of these styles that best fits the topic:
-  • CINEMATIC PRODUCT SHOT: dramatic studio lighting, dark background, single hero object bursting with energy
-  • EXPLOSIVE 3D CONCEPT: vivid isometric scene, deep colors, neon highlights, claymorphism
-  • MACRO HYPER-DETAIL: extreme close-up of the most visually striking element of the topic, bokeh, razor-sharp focus, saturated colors
-  • EDITORIAL COLLAGE: bold graphic art, geometric shapes, high-contrast colors, abstract representation of the concept
-- NO human faces. NO text, logos, letters, or watermarks.
-- MUST be visually jaw-dropping. A blog reader scrolling at speed MUST stop and click.
-- Return ONLY the image prompt sentence. Nothing else. No preamble.`
+          role: 'system',
+          content: `You are a creative director for a viral digital magazine. Write a single image prompt for an AI image generator producing a stunning, click-inducing thumbnail. Return ONLY the prompt sentence without preamble.`,
         },
         {
-          role: "user",
-          content: `ARTICLE TITLE: "${title}"
-${contextInfo}
-
-Write a 1–2 sentence, hyper-specific, visually explosive AI image prompt. Make it so compelling that someone who sees this image CANNOT resist clicking to read the article.`
-        }
+          role: 'user',
+          content: `ARTICLE TITLE: "${title}"\n${contextInfo}`,
+        },
       ],
-      model: DISCOVERY_MODEL
+      model: GROQ_MODELS.DISCOVERY,
     });
-    
-    let imagePrompt = cleanResult(promptCompletion.choices[0].message.content || `A premium and relevant 3D concept art piece representing: ${title}`);
 
-    // Safety Check: If the AI returned a URL instead of a prompt, discard it
-    if (imagePrompt.startsWith('http') || imagePrompt.includes('unsplash.com') || imagePrompt.includes('rebrand.ly')) {
-      console.warn(`[SEO] AI returned a URL as a prompt! Discarding and using title-based prompt.`);
-      imagePrompt = `A premium and high-fidelity 3D digital art piece representing: ${title}. High-tech aesthetic, cinematic lighting.`;
+    let imagePrompt = cleanResult(promptRes.text || `A premium 3D concept art piece representing: ${title}`);
+    if (imagePrompt.startsWith('http') || imagePrompt.includes('unsplash.com')) {
+      imagePrompt = `A premium 3D digital art piece representing: ${title}. High-tech aesthetic, cinematic lighting.`;
     }
 
-    // B. Check for API Keys (DALL-E 3)
-    const openaiKey = process.env.OPENAI_API_KEY;
-
-    if (openaiKey) {
-      console.log(`[SEO] Calling DALL-E 3 API (Real)...`);
-      const { openai } = getAI();
-      const image = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: imagePrompt,
-        n: 1,
-        size: "1024x1024",
-      });
-      if (image.data && image.data[0] && image.data[0].url) {
-         console.log(`[SEO] DALL-E 3 Image Generation Successful!`);
-         return image.data[0].url;
+    if (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY) {
+      try {
+        const openai = new (await import('openai')).default({ apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY });
+        const image = await openai.images.generate({
+          model: 'dall-e-3',
+          prompt: imagePrompt,
+          n: 1,
+          size: '1024x1024',
+        });
+        if (image.data?.[0]?.url) return image.data[0].url;
+      } catch (dallErr) {
+        logger.warn('DALL-E 3 failed, falling back to Pollinations', 'SEO', dallErr);
       }
     }
 
-    // C. Fallback to free AI Image generation (Pollinations) if DALL-E limit hit or no keys
-    // Use a seed derived from the title to guarantee unique images per article
     const titleSeed = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 999983;
-    const randomBoost = Math.floor(Math.random() * 10000);
-    const uniqueSeed = titleSeed + randomBoost;
-    console.log(`[SEO] Falling back to Pollinations. Unique seed: ${uniqueSeed}`);
-    
-    // Use a default public key if one isn't provided in the environment
-    const pollKey = process.env.POLLINATIONS_API_KEY || ''; // Not needed for the free prompt endpoint
-    
-    // IMPORTANT: Append .jpg so Instagram's API recognizes the media type (Fixes Code 9004)
+    const uniqueSeed = titleSeed + Math.floor(Math.random() * 10000);
     const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}.jpg?width=1200&height=630&nologo=true&seed=${uniqueSeed}&enhance=true&model=flux`;
-    
+
     try {
-      console.log(`[SEO] Warming up AI Image cache to prevent social API timeouts...`);
-      // This forces the image to generate now. When Instagram scrapes it later, it returns instantly.
       await fetch(fallbackUrl);
-    } catch (e) {
-      console.warn(`[SEO] Warmup fetch failed, continuing anyway.`);
+    } catch {
+      // Warmup fetch failure is non-blocking
     }
-
     return fallbackUrl;
-  } catch (err: any) {
-    console.warn(`[SEO ERROR] Image generation failed:`, err.message || err);
-    const errorFallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}?width=1200&height=630&nologo=true&model=flux`;
-    try { await fetch(errorFallback); } catch (e) {}
-    return errorFallback;
+  } catch (err: unknown) {
+    logger.warn('Image generation failed, using emergency fallback', 'SEO', err);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(title)}?width=1200&height=630&nologo=true&model=flux`;
   }
 }
 
-
-// 4. Auto-Publisher (WordPress / Sanity / Local)
+// 4. Auto-Publisher
 export async function publishToLocal(article: DraftArticle, keyword: string, category?: string): Promise<PublishResult> {
-  console.log(`[PUBLISHER] Attempting to save '${article.title}' to local storage...`);
-  try {
-    const post = await savePost({
-      title: article.title,
-      content: article.content,
-      metaDescription: article.metaDescription,
-      ogImageUrl: article.ogImageUrl,
-      status: 'published',
-      keyword: keyword,
-      category: category
-    });
-    
-    console.log(`[PUBLISHER] ✅ Saved successfully as ID: ${post.id}. Slug: ${post.slug}`);
-    
-    return { 
-      status: "success", 
-      id: post.id,
-      url: `/blog/${post.slug}`, 
-      platform: "Local-Pulse-Blog"
-    };
-  } catch (error: any) {
-    console.error(`[PUBLISHER ERROR] Local save failed: ${error.message}`);
-    throw error;
-  }
-}
-export async function publishToWordpress(article: DraftArticle): Promise<PublishResult> {
-  console.log(`[PUBLISHER] Preparing for WordPress publication...`);
-  
-  const wpBaseUrl = process.env.WP_BASE_URL;
-  const wpAppPassword = process.env.WP_APP_PASSWORD;
+  logger.info(`Saving '${article.title}' to storage`, 'PUBLISHER');
+  const post = await savePost({
+    title: article.title,
+    content: article.content,
+    metaDescription: article.metaDescription,
+    ogImageUrl: article.ogImageUrl,
+    status: 'published',
+    keyword,
+    category,
+  });
 
-  if (wpBaseUrl && wpAppPassword) {
-    console.log(`[PUBLISHER] Pushing to WordPress: ${wpBaseUrl}`);
-    // Realistic implementation would use a fetch/axios POST to /wp-json/wp/v2/posts
-    return { status: "success", url: `${wpBaseUrl}/?p=123`, platform: "WordPress" };
-  }
-
-  // Fallback / Mock
-  console.log(`[PUBLISHER WARNING] WordPress credentials missing. Using mock.`);
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return { 
-    status: "success", 
-    url: "https://yourblog.wp.com/niche-content-post",
-    platform: "WordPress-Mock"
+  return {
+    status: 'success',
+    id: post.id,
+    url: `/blog/${post.slug}`,
+    platform: 'Local-Pulse-Blog',
   };
 }
 
-export async function publishToSanity(article: DraftArticle): Promise<PublishResult> {
-  console.log(`[PUBLISHER] Pushing to Sanity CMS...`);
-  const sanityProjectId = process.env.SANITY_PROJECT_ID;
+export async function publishToWordpress(article: DraftArticle): Promise<PublishResult> {
+  const wpBaseUrl = env.WP_BASE_URL || process.env.WP_BASE_URL;
+  const wpAppPassword = env.WP_APP_PASSWORD || process.env.WP_APP_PASSWORD;
 
-  if (sanityProjectId) {
-    return { status: "success", url: `https://${sanityProjectId}.sanity.studio`, platform: "Sanity" };
+  if (wpBaseUrl && wpAppPassword) {
+    logger.info(`Pushing '${article.title}' to WordPress at: ${wpBaseUrl}`, 'PUBLISHER');
+    return { status: 'success', url: `${wpBaseUrl}/?p=123`, platform: 'WordPress' };
   }
 
-  return { status: "error", message: "Sanity Project ID missing", platform: "Sanity" };
+  await delay(200);
+  return { status: 'success', url: 'https://yourblog.wp.com/niche-content-post', platform: 'WordPress-Mock' };
+}
+
+export async function publishToSanity(article: DraftArticle): Promise<PublishResult> {
+  const sanityProjectId = env.SANITY_PROJECT_ID || process.env.SANITY_PROJECT_ID;
+  if (sanityProjectId) {
+    logger.info(`Pushing '${article.title}' to Sanity project: ${sanityProjectId}`, 'PUBLISHER');
+    return { status: 'success', url: `https://${sanityProjectId}.sanity.studio`, platform: 'Sanity' };
+  }
+  return { status: 'error', message: 'Sanity Project ID missing', platform: 'Sanity' };
 }
 
 export async function publishToInstagram(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
-  const businessId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID?.trim();
-  // Aggressive sanitization: remove any invisible characters or quotes
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
-
+  const businessId = (env.INSTAGRAM_BUSINESS_ACCOUNT_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '').trim();
+  const token = (env.INSTAGRAM_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN || '').trim().replace(/['"]+/g, '');
 
   if (!businessId || !token) {
-    const missing = [];
-    if (!businessId) missing.push("INSTAGRAM_BUSINESS_ACCOUNT_ID");
-    if (!token) missing.push("INSTAGRAM_ACCESS_TOKEN");
-    
-    console.warn(`[SOCIAL WARNING] Instagram credentials missing (${missing.join(', ')}). Skipping real post.`);
-    return { 
-      status: "skipped", 
-      message: `Instagram credentials missing: ${missing.join(', ')}. Add them to .env.local`, 
-      platform: "Instagram" 
+    return {
+      status: 'skipped',
+      message: 'Instagram credentials missing. Add INSTAGRAM_BUSINESS_ACCOUNT_ID and INSTAGRAM_ACCESS_TOKEN to .env.local',
+      platform: 'Instagram',
     };
   }
 
   try {
-    console.log(`[SOCIAL] Creating Instagram media container for: ${article.title}`);
-    
-    // Step 1: Generate AI-Optimized Caption
     const caption = await generateSocialCaption('instagram', article.title, article.content, blogUrl);
-    
-    // Step 2: Create Media Container
-    
-    // Normalize image URL: Instagram requires the URL to resolve to a JPEG.
-    // Pollinations URLs need a .jpg extension before the query string.
     let imageUrl = article.ogImageUrl || '';
-    if ((imageUrl.includes('pollinations.ai')) && !imageUrl.includes('.jpg?') && !imageUrl.endsWith('.jpg')) {
-      // Insert .jpg before the query string if present, or append it
-      imageUrl = imageUrl.includes('?') 
-        ? imageUrl.replace('?', '.jpg?') 
-        : imageUrl + '.jpg';
+    if (imageUrl.includes('pollinations.ai') && !imageUrl.includes('.jpg?') && !imageUrl.endsWith('.jpg')) {
+      imageUrl = imageUrl.includes('?') ? imageUrl.replace('?', '.jpg?') : imageUrl + '.jpg';
     }
 
-    // Use a proxy for Pollinations images to ensure stable delivery to Meta (Fixes 9004)
-    if (imageUrl.includes('pollinations.ai')) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://niche-content-engine.vercel.app';
-      const proxyUrl = `${appUrl}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
-      console.log(`[INSTAGRAM] Using Proxied Image: ${proxyUrl}`);
-      imageUrl = proxyUrl;
-    } else {
-      console.log(`[INSTAGRAM] Using image URL: ${imageUrl}`);
-    }
-
-    // Move access_token to Query String for maximum reliability
     const url = `https://graph.facebook.com/v20.0/${businessId}/media?access_token=${token}`;
-    console.log(`[INSTAGRAM DEBUG] Request URL: ${url}`);
-    console.log(`[INSTAGRAM DEBUG] Payload:`, JSON.stringify({ image_url: imageUrl, caption: caption }, null, 2));
-
     const containerRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        caption: caption,
-      }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: imageUrl, caption }),
     });
 
     const containerData = await containerRes.json();
     if (!containerData.id) {
-      let fbError = containerData.error?.message || "Failed to create media container";
-      const fbCode = containerData.error?.code;
-      
-      if (fbCode === 25) {
-        fbError = "User access is restricted. Your token likely lacks 'instagram_basic' or 'instagram_content_publish' permissions. Check implementation_plan.md.";
-      }
-      
-      const codeStr = fbCode ? `(Code ${fbCode})` : "";
-      console.error('[INSTAGRAM ERROR]', JSON.stringify(containerData, null, 2));
-      throw new Error(`${fbError} ${codeStr}`);
+      throw new Error(containerData.error?.message || 'Failed to create Instagram media container');
     }
 
-    const creationId = containerData.id;
-    console.log(`[SOCIAL] Container created: ${creationId}. Waiting for processing...`);
-
-    // Step 2: Meta needs a moment to process the image
-    await new Promise(resolve => setTimeout(resolve, 15000));
-
-    // Step 3: Publish Media
-    console.log(`[SOCIAL] Publishing to Instagram...`);
+    await delay(10000);
     const publishRes = await fetch(`https://graph.facebook.com/v20.0/${businessId}/media_publish?access_token=${token}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        creation_id: creationId,
-      }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creation_id: containerData.id }),
     });
 
     const publishData = await publishRes.json();
     if (!publishData.id) {
-       let fbError = publishData.error?.message || "Failed to publish media";
-       const fbCode = publishData.error?.code;
-       
-       if (fbCode === 25) {
-         fbError = "User access is restricted. This typically means your token is missing 'instagram_basic' or 'instagram_content_publish' permissions, or the account has a security checkpoint. Please check the instructions in the implementation_plan.md.";
-       }
-       
-       const codeStr = fbCode ? `(Code ${fbCode})` : "";
-       console.error('[INSTAGRAM ERROR PUBLISH]', JSON.stringify(publishData, null, 2));
-       throw new Error(`${fbError} ${codeStr}`);
+      throw new Error(publishData.error?.message || 'Failed to publish media to Instagram');
     }
 
-    // Fetch the actual permalink for the published media
-    let finalUrl = `https://instagram.com/p/${publishData.id}`;
-    try {
-      const mediaRes = await fetch(`https://graph.facebook.com/v20.0/${publishData.id}?fields=permalink&access_token=${token}`);
-      const mediaData = await mediaRes.json();
-      if (mediaData.permalink) {
-        finalUrl = mediaData.permalink;
-      }
-    } catch (e) {
-      console.warn('[SOCIAL] Failed to fetch instagram permalink, falling back to ID');
-    }
-
-    return { 
-      status: "success", 
-      url: finalUrl, 
-      platform: "Instagram" 
+    return {
+      status: 'success',
+      url: `https://instagram.com/p/${publishData.id}`,
+      platform: 'Instagram',
     };
-  } catch (error: any) {
-    console.error(`[SOCIAL ERROR] Instagram failed: ${error.message}`);
-    return { status: "error", message: error.message, platform: "Instagram" };
+  } catch (error: unknown) {
+    logger.error('Instagram publish failed', 'SOCIAL', error);
+    return { status: 'error', message: stringifyError(error), platform: 'Instagram' };
   }
 }
 
-// ---- X / Twitter Integration (API v2 + OAuth 1.0a) ----
-
-function generateOAuthNonce() {
-  return Math.random().toString(36).substring(2, 11);
-}
-
+// Twitter OAuth & Publish
 function percentEncode(str: string) {
   return encodeURIComponent(str)
     .replace(/!/g, '%21')
@@ -778,248 +513,130 @@ function percentEncode(str: string) {
     .replace(/\)/g, '%29');
 }
 
-async function hmacSha1(key: string, data: string): Promise<string> {
-  const { createHmac } = await import('crypto');
-  return createHmac('sha1', key).update(data).digest('base64');
-}
-
-async function generateOAuthHeader(
-  method: string,
-  url: string,
-  oauthParams: Record<string, string>,
-  consumerSecret: string,
-  tokenSecret: string
-) {
-  // Build the signature base string
-  const sortedParams = Object.keys(oauthParams).sort().map(k => `${percentEncode(k)}=${percentEncode(oauthParams[k])}`).join('&');
-  const baseString = `${method}&${percentEncode(url)}&${percentEncode(sortedParams)}`;
-  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`;
-  
-  const signature = await hmacSha1(signingKey, baseString);
-  oauthParams['oauth_signature'] = signature;
-
-  // Build the Authorization header
-  const headerParts = Object.keys(oauthParams).sort().map(k => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`).join(', ');
-  return `OAuth ${headerParts}`;
-}
-
 export async function publishToTwitter(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
-  const apiKey = process.env.TWITTER_API_KEY?.trim();
-  const apiSecret = process.env.TWITTER_API_SECRET?.trim();
-  const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim();
-  const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET?.trim();
+  const apiKey = (env.TWITTER_API_KEY || process.env.TWITTER_API_KEY || '').trim();
+  const apiSecret = (env.TWITTER_API_SECRET || process.env.TWITTER_API_SECRET || '').trim();
+  const accessToken = (env.TWITTER_ACCESS_TOKEN || process.env.TWITTER_ACCESS_TOKEN || '').trim();
+  const accessSecret = (env.TWITTER_ACCESS_TOKEN_SECRET || process.env.TWITTER_ACCESS_TOKEN_SECRET || '').trim();
 
   if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
-    console.warn(`[SOCIAL WARNING] X/Twitter credentials missing. Skipping post.`);
-    return { status: "skipped", message: "X/Twitter credentials missing. Add TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET to .env.local", platform: "X/Twitter" };
+    return { status: 'skipped', message: 'X/Twitter credentials missing.', platform: 'X/Twitter' };
   }
 
   try {
-    console.log(`[SOCIAL] Composing tweet for: ${article.title}`);
-
-    // Step 1: Generate AI-Optimized Caption
     let tweetText = await generateSocialCaption('twitter', article.title, article.content, blogUrl);
+    if (tweetText.length > 280) tweetText = tweetText.substring(0, 277) + '...';
 
-    // Step 2: Ensure under 280 chars (aggressive truncation for X)
-    if (tweetText.length > 280) {
-      console.log(`[SOCIAL] Tweet too long (${tweetText.length} chars). Truncating...`);
-      // Keep first 250 chars and ensure link is visible if present
-      tweetText = tweetText.substring(0, 277) + "...";
-    }
-
-    // Twitter API v2 endpoint
     const tweetUrl = 'https://api.twitter.com/2/tweets';
-
     const oauthParams: Record<string, string> = {
       oauth_consumer_key: apiKey,
-      oauth_nonce: generateOAuthNonce(),
+      oauth_nonce: Math.random().toString(36).substring(2, 11),
       oauth_signature_method: 'HMAC-SHA1',
       oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
       oauth_token: accessToken,
       oauth_version: '1.0',
     };
 
-    console.log('[X DEBUG] OAuth Params:', { ...oauthParams, oauth_consumer_key: 'HIDDEN' });
+    const sortedParams = Object.keys(oauthParams).sort().map((k) => `${percentEncode(k)}=${percentEncode(oauthParams[k])}`).join('&');
+    const baseString = `POST&${percentEncode(tweetUrl)}&${percentEncode(sortedParams)}`;
+    const signingKey = `${percentEncode(apiSecret)}&${percentEncode(accessSecret)}`;
 
-    const authHeader = await generateOAuthHeader('POST', tweetUrl, oauthParams, apiSecret, accessSecret);
+    const { createHmac } = await import('crypto');
+    oauthParams['oauth_signature'] = createHmac('sha1', signingKey).update(baseString).digest('base64');
 
-    console.log(`[SOCIAL] Posting tweet to X...`);
+    const authHeader = `OAuth ${Object.keys(oauthParams).sort().map((k) => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`).join(', ')}`;
     const res = await fetch(tweetUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: tweetText }),
     });
 
     const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.title || 'Failed to post tweet');
 
-    if (!res.ok) {
-      console.error('[X ERROR DEBUG]', JSON.stringify(data, null, 2));
-      throw new Error(data.detail || data.title || JSON.stringify(data.errors) || 'Failed to post tweet');
-    }
-
-    const tweetId = data.data?.id;
-    console.log(`[SOCIAL] ✅ Tweet posted: ${tweetId}`);
-
-    return {
-      status: "success",
-      url: `https://x.com/i/status/${tweetId}`,
-      platform: "X/Twitter"
-    };
-  } catch (error: any) {
-    console.error(`[SOCIAL ERROR] X/Twitter failed: ${error.message}`);
-    return { status: "error", message: error.message, platform: "X/Twitter" };
+    return { status: 'success', url: `https://x.com/i/status/${data.data?.id}`, platform: 'X/Twitter' };
+  } catch (error: unknown) {
+    logger.error('Twitter publish failed', 'SOCIAL', error);
+    return { status: 'error', message: stringifyError(error), platform: 'X/Twitter' };
   }
 }
 
 export async function publishToTikTok(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
   const token = await getTikTokToken();
-
   if (!token) {
-    console.warn(`[SOCIAL WARNING] TikTok token missing or expired. Connect via /api/auth/tiktok/connect`);
-    return { 
-      status: "skipped", 
-      message: "TikTok not connected. Visit /api/auth/tiktok/connect to authorize.", 
-      platform: "TikTok" 
-    };
+    return { status: 'skipped', message: 'TikTok not connected.', platform: 'TikTok' };
   }
 
   try {
-    console.log(`[SOCIAL] Initializing TikTok Direct Post for: ${article.title}`);
-    
-    // Step 1: Generate AI-Optimized Caption
     const caption = await generateSocialCaption('tiktok', article.title, article.content, blogUrl);
-
-    // TikTok Direct Post V2 - Photos via URL
-    // Note: char limit is 2,200 but line breaks might be ignored by some TikTok clients
     const res = await fetch('https://open.tiktokapis.com/v2/post/publish/content/init/', {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         post_info: {
-          title: article.title.substring(0, 90), // TikTok title limit
-          description: caption.substring(0, 2100), // Safety margin
-          privacy_level: "PUBLIC_TO_EVERYONE",
+          title: article.title.substring(0, 90),
+          description: caption.substring(0, 2100),
+          privacy_level: 'PUBLIC_TO_EVERYONE',
           disable_comment: false,
         },
         source_info: {
-          source: "PULL_FROM_URL",
+          source: 'PULL_FROM_URL',
           photo_urls: [article.ogImageUrl],
         },
-        post_mode: "MEDIA_POST",
-        media_type: "PHOTO",
+        post_mode: 'MEDIA_POST',
+        media_type: 'PHOTO',
       }),
     });
 
     const data = await res.json();
-    
-    // TikTok sometimes returns 200 OK but includes an error payload
     if (!res.ok || data.error || !data.data?.publish_id) {
-       console.error('[TIKTOK ERROR]', JSON.stringify(data, null, 2));
-       throw new Error((data.error?.message) || `TikTok API Error: Publish ID missing or invalid request.`);
+      throw new Error(data.error?.message || 'TikTok API Error: Publish ID missing');
     }
 
-    // TikTok posting is asynchronous, return the publish_id
     const publishId = data.data.publish_id;
-    console.log(`[SOCIAL] ✅ TikTok Pulse Initiated: ${publishId}`);
-
-    return { 
-      status: "success", 
-      url: `https://tiktok.com/publish/${publishId}`, // Placeholder until processed
-      id: publishId,
-      platform: "TikTok" 
-    };
-  } catch (error: any) {
-    console.error(`[SOCIAL ERROR] TikTok failed: ${error.message}`);
-    return { status: "error", message: error.message, platform: "TikTok" };
+    return { status: 'success', url: `https://tiktok.com/publish/${publishId}`, id: publishId, platform: 'TikTok' };
+  } catch (error: unknown) {
+    logger.error('TikTok publish failed', 'SOCIAL', error);
+    return { status: 'error', message: stringifyError(error), platform: 'TikTok' };
   }
 }
 
 export async function publishToFacebook(article: DraftArticle, blogUrl?: string): Promise<PublishResult> {
-  const pageId = process.env.FACEBOOK_PAGE_ID || '61578555009232';
-  // Aggressive sanitization: remove any invisible characters, quotes, or spaces
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim().replace(/['"]+/g, '');
+  const pageId = (env.FACEBOOK_PAGE_ID || process.env.FACEBOOK_PAGE_ID || '').trim();
+  const token = (env.FACEBOOK_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '').trim().replace(/['"]+/g, '');
 
   if (!pageId || !token) {
-    const missing = [];
-    if (!pageId) missing.push("FACEBOOK_PAGE_ID");
-    if (!token) missing.push("FACEBOOK_PAGE_ACCESS_TOKEN");
-
-    console.warn(`[SOCIAL WARNING] Facebook Page credentials missing (${missing.join(', ')}). Skipping post.`);
-    return { 
-      status: "skipped", 
-      message: `Facebook credentials missing: ${missing.join(', ')}. Add them to .env.local`, 
-      platform: "Facebook" 
-    };
+    return { status: 'skipped', message: 'Facebook credentials missing.', platform: 'Facebook' };
   }
 
   try {
-    console.log(`[SOCIAL] Composing Facebook post for: ${article.title}`);
-    
-    // Step 1: Generate AI-Optimized Caption
     const caption = await generateSocialCaption('facebook', article.title, article.content, blogUrl);
-
-    // Facebook Graph API - Posting to Page Feed
-    // We post a "Link" post which naturally pulls the OG metadata (image, title, desc)
-    const url = `https://graph.facebook.com/v20.0/${pageId}/feed`;
-    const payload = {
-      message: caption,
-      link: blogUrl,
-      access_token: token
-    };
-    
-    console.log(`[FACEBOOK DEBUG] Request URL: ${url}`);
-    console.log(`[FACEBOOK DEBUG] Payload:`, JSON.stringify({ ...payload, access_token: 'HIDDEN' }, null, 2));
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+    const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/feed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: caption, link: blogUrl, access_token: token }),
     });
 
     const data = await res.json();
-    
-    if (!res.ok || data.error) {
-       console.error('[FACEBOOK ERROR]', JSON.stringify(data, null, 2));
-       throw new Error(data.error?.message || `Facebook API Error: Failed to post to page.`);
-    }
+    if (!res.ok || data.error) throw new Error(data.error?.message || 'Facebook API error');
 
-    // Facebook returns an ID formatted as {page_id}_{post_id}
     const postId = data.id;
-    console.log(`[SOCIAL] ✅ Facebook Post ID: ${postId}`);
-
-    // Permalink structure: https://facebook.com/{page_id}/posts/{short_post_id}
     const shortPostId = postId.split('_')[1] || postId;
-    const finalUrl = `https://www.facebook.com/${pageId}/posts/${shortPostId}`;
-
-    return { 
-      status: "success", 
-      url: finalUrl, 
-      id: postId,
-      platform: "Facebook" 
-    };
-  } catch (error: any) {
-    console.error(`[SOCIAL ERROR] Facebook failed: ${error.message}`);
-    return { status: "error", message: error.message, platform: "Facebook" };
+    return { status: 'success', url: `https://www.facebook.com/${pageId}/posts/${shortPostId}`, id: postId, platform: 'Facebook' };
+  } catch (error: unknown) {
+    logger.error('Facebook publish failed', 'SOCIAL', error);
+    return { status: 'error', message: stringifyError(error), platform: 'Facebook' };
   }
 }
 
-// Scheduling Helper
-export function calculatePeakTime() {
-  const peakHours = [9, 13, 19, 21]; // EST/Universal peak times
+export function calculatePeakTime(): string {
+  const peakHours = [9, 13, 19, 21];
   const currentHour = new Date().getHours();
-  const nextPeak = peakHours.find(h => h > currentHour) || peakHours[0];
-  
+  const nextPeak = peakHours.find((h) => h > currentHour) || peakHours[0];
+
   const scheduleDate = new Date();
   scheduleDate.setHours(nextPeak, 0, 0, 0);
   if (nextPeak <= currentHour) scheduleDate.setDate(scheduleDate.getDate() + 1);
-  
+
   return scheduleDate.toISOString();
 }

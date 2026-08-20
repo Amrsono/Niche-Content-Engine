@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import type { Post } from './types';
 
-const STORAGE_KEY = "pulse-blog-posts";
-
 export function usePosts() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
