@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useAdminGuard } from '@/app/hooks/useAdminGuard';
+import { logger } from '@/lib/logger';
 import { FloatingNav } from '../components/FloatingNav';
 import { BentoBox } from '../components/BentoBox';
 import { 
@@ -30,18 +30,7 @@ interface TrendItem {
 }
 
 export default function AnalyticsPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
-
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
-  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
-
-  useEffect(() => {
-    if (isLoaded && !isAdmin) {
-      router.push("/blog");
-    }
-  }, [isLoaded, isAdmin, router]);
+  const { isLoaded, isAdmin } = useAdminGuard();
 
   const [targetNiches, setTargetNiches] = useState<TrendItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +46,8 @@ export default function AnalyticsPage() {
   const currentData = chartDataSets[activeTab];
 
   useEffect(() => {
+    if (!isLoaded || !isAdmin) return;
+
     async function fetchTrends() {
       try {
         const res = await fetch('/api/trends');
@@ -66,7 +57,7 @@ export default function AnalyticsPage() {
           setTargetNiches(data.trends.slice(0, 6));
         }
       } catch (err) {
-        console.error("Failed to fetch trends", err);
+        logger.error("Failed to fetch trends", "ANALYTICS_PAGE", err);
       } finally {
         setLoading(false);
       }
@@ -78,7 +69,11 @@ export default function AnalyticsPage() {
     // Refresh frequently (every 1 minute)
     const interval = setInterval(fetchTrends, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isLoaded, isAdmin]);
+
+  if (!isLoaded || !isAdmin) {
+    return null;
+  }
 
   return (
     <main className={styles.main}>

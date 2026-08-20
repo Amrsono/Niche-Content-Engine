@@ -4,14 +4,13 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { UserButton, SignInButton, useUser } from '@clerk/nextjs';
+import { isUserAdmin } from '@/lib/env';
 import styles from './FloatingNav.module.css';
 
 export function FloatingNav() {
   const { isSignedIn, isLoaded, user } = useUser();
-
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
-  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const isAdmin = Boolean(isSignedIn && isUserAdmin(userEmail));
 
   return (
     <motion.nav 

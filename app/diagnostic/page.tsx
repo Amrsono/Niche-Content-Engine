@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+
+import React, { useState } from 'react';
+import { useAdminGuard } from '../hooks/useAdminGuard';
 import { FloatingNav } from '../components/FloatingNav';
 import { BentoBox } from '../components/BentoBox';
 import { AlertCircle, CheckCircle2, Play, Activity } from 'lucide-react';
@@ -16,18 +16,7 @@ const MODELS_TO_TEST = [
 ];
 
 export default function DiagnosticPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
-
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
-  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
-
-  useEffect(() => {
-    if (isLoaded && !isAdmin) {
-      router.push("/blog");
-    }
-  }, [isLoaded, isAdmin, router]);
+  useAdminGuard();
 
   const [results, setResults] = useState<Record<string, { status: 'loading' | 'success' | 'error', message?: string }>>({});
   const [isTesting, setIsTesting] = useState(false);

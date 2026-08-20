@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
 import { FloatingNav } from '../../components/FloatingNav';
 import { IndexingStatusCard } from '../../components/IndexingStatusCard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import styles from './indexing.module.css';
+import { useAdminGuard } from '../../hooks/useAdminGuard';
 
 interface IndexResult {
   url: string;
@@ -38,17 +37,7 @@ type Status = 'idle' | 'loading' | 'done' | 'error';
 const DAILY_QUOTA = 200;
 
 export default function IndexingPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
-
-  const adminEmails =
-    process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map((e) => e.trim().toLowerCase()) || [];
-  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
-
-  useEffect(() => {
-    if (isLoaded && !isAdmin) router.push('/blog');
-  }, [isLoaded, isAdmin, router]);
+  const { isLoaded, isAdmin } = useAdminGuard();
 
   const [status, setStatus] = useState<Status>('idle');
   const [result, setResult] = useState<BatchResult | null>(null);

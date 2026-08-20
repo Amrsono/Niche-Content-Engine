@@ -72,7 +72,8 @@ export function getAvailableAIProviders(): { groq: boolean; gemini: boolean; ope
  */
 export function isUserAdmin(email?: string | null): boolean {
   if (!email) return false;
-  const adminList = (env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+  const rawAdminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? env.NEXT_PUBLIC_ADMIN_EMAILS ?? '';
+  const adminList = rawAdminEmails
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
