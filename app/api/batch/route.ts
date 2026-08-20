@@ -1,12 +1,32 @@
 import { NextResponse } from 'next/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
+import { BatchRequestSchema, validateRequestBody } from '@/lib/validation';
+import { isUserAdmin } from '@/lib/env';
 
 export async function POST(request: Request) {
   try {
-    const { niche, count = 5 } = await request.json();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await currentUser();
+    const email = user?.emailAddresses?.[0]?.emailAddress;
+    if (!isUserAdmin(email)) {
+      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const validation = validateRequestBody(BatchRequestSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+
+    const { niche, count } = validation.data;
     logger.info(`Starting bulk cycle for niche: ${niche} (Count: ${count})`, 'BATCH');
     
     // 1. Discovery Phase

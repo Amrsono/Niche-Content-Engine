@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logger } from "@/lib/logger";
 import { stringifyError } from "@/lib/ai/utils";
+import { DiagnosticRequestSchema, validateRequestBody } from "@/lib/validation";
 
 export async function POST(req: Request) {
   try {
-    const { model: modelName } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const validation = validateRequestBody(DiagnosticRequestSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+
+    const { model: modelName } = validation.data;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {

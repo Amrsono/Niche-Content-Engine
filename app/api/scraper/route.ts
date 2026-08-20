@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, calculatePeakTime, updatePost, PublishResult } from '@/lib/agents';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
+import { ScraperRequestSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
-    const { niche } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const validation = validateRequestBody(ScraperRequestSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+
+    const { niche } = validation.data;
     
     // 1. Discovery Phase
     const trends = await runTrendScraper(niche || 'All Trends');

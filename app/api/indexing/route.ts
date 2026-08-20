@@ -5,23 +5,29 @@ import { getPosts } from '@/lib/storage';
 import { isUserAdmin } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
+import { IndexingRequestSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
 
     if (!isUserAdmin(email)) {
-      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));
-    const mode: string = body.mode || 'custom';
+    const validation = validateRequestBody(IndexingRequestSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+
+    const { mode, urls: inputUrls } = validation.data;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
 
     let urls: string[] = [];
@@ -35,11 +41,11 @@ export async function POST(request: Request) {
         urls = [`${siteUrl}/blog/${posts[0].slug}`];
       }
     } else {
-      urls = Array.isArray(body.urls) ? body.urls : [];
+      urls = inputUrls || [];
     }
 
     if (urls.length === 0) {
-      return NextResponse.json({ error: 'No URLs to index' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'No URLs to index' }, { status: 400 });
     }
 
     const result = await batchRequestIndexing(urls);
@@ -55,21 +61,21 @@ export async function GET(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
 
     if (!isUserAdmin(email)) {
-      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
+      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
 
     if (!url) {
-      return NextResponse.json({ error: 'Missing ?url= parameter' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Missing ?url= parameter' }, { status: 400 });
     }
 
     const status = await getIndexingStatus(decodeURIComponent(url));

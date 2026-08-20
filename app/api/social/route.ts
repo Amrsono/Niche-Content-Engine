@@ -5,6 +5,7 @@ import { publishToInstagram, publishToTwitter, publishToTikTok, publishToFaceboo
 import type { Post } from '@/lib/types';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
+import { SocialSignalRequestSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -13,12 +14,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { platform, slug } = await request.json();
-    const origin = request.headers.get('origin') || `http://${request.headers.get('host')}` || 'http://localhost:3000';
-
-    if (!slug || !platform) {
-      return NextResponse.json({ success: false, error: 'Missing slug or platform' }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const validation = validateRequestBody(SocialSignalRequestSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
+
+    const { platform, slug } = validation.data;
+    const origin = request.headers.get('origin') || `http://${request.headers.get('host')}` || 'http://localhost:3000';
 
     const post = await getPostBySlug(slug);
     if (!post) {

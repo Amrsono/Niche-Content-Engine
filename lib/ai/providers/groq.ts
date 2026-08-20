@@ -10,6 +10,7 @@ export const GROQ_MODELS = {
 
 export type GroqChatParams = Parameters<Groq['chat']['completions']['create']>[0];
 export type GroqChatCompletion = Groq.Chat.Completions.ChatCompletion;
+export type GroqChatResponse = GroqChatCompletion;
 
 let groqClient: Groq | null = null;
 
