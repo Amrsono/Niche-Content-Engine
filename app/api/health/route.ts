@@ -7,7 +7,7 @@ export async function GET() {
   const uptime = process.uptime();
 
   return NextResponse.json({
-    status: 'healthy',
+    status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.1.0',
     environment: process.env.NODE_ENV || 'development',
