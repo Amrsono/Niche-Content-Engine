@@ -15,7 +15,7 @@
     "@clerk/nextjs": "^7.0.5",
     "@google/generative-ai": "^0.24.1",
     "@vercel/analytics": "^2.0.1",
-    "axios": "^1.13.6",
+    "axios": "^1.19.0",
     "clsx": "^2.1.1",
     "fast-xml-parser": "^5.5.8",
     "framer-motion": "^12.38.0",
