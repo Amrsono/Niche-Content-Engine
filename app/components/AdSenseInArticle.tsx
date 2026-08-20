@@ -6,8 +6,12 @@ import styles from "./AdStyles.module.css";
 export default function AdSenseInArticle() {
   useEffect(() => {
     try {
-      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-    } catch (e) {}
+      const win = window as unknown as { adsbygoogle?: unknown[] };
+      win.adsbygoogle = win.adsbygoogle || [];
+      win.adsbygoogle.push({});
+    } catch {
+      // Ignored for ad blockers
+    }
   }, []);
 
   return (

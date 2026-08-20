@@ -54,8 +54,9 @@ export default function DiagnosticPage() {
         } else {
           setResults(prev => ({ ...prev, [model]: { status: 'error', message: data.error } }));
         }
-      } catch (err: any) {
-        setResults(prev => ({ ...prev, [model]: { status: 'error', message: err.message } }));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setResults(prev => ({ ...prev, [model]: { status: 'error', message: msg } }));
       }
     }
     setIsTesting(false);

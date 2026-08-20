@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fetchGoogleTrends, scrapeTikTokTrends } from '@/lib/scraper';
+import { fetchGoogleTrends, scrapeTikTokTrends, GoogleTrendItem, TikTokTrendItem } from '@/lib/scraper';
+import { stringifyError } from '@/lib/ai/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,24 +11,23 @@ export async function GET() {
       scrapeTikTokTrends()
     ]);
 
-    // Map trends to random (but stable-ish) global coordinates, ensuring they stay safely away from edges to prevent tooltips from being cropped
     const coordinates = [
-      { top: '35%', left: '25%' }, // North America
-      { top: '45%', left: '50%' }, // Europe
-      { top: '55%', left: '75%' }, // Asia/East
-      { top: '65%', left: '30%' }, // South America
-      { top: '75%', left: '60%' }, // Africa/South
-      { top: '30%', left: '70%' }, // North Asia
+      { top: '35%', left: '25%' },
+      { top: '45%', left: '50%' },
+      { top: '55%', left: '75%' },
+      { top: '65%', left: '30%' },
+      { top: '75%', left: '60%' },
+      { top: '30%', left: '70%' },
     ];
 
     const combined = [
-      ...googleTrends.slice(0, 3).map((t: any, i: number) => ({
+      ...googleTrends.slice(0, 3).map((t: GoogleTrendItem, i: number) => ({
         keyword: t.title,
         growth: t.traffic || 'High',
         type: 'Google',
         ...coordinates[i % coordinates.length]
       })),
-      ...tiktokTrends.map((t: any, i: number) => ({
+      ...tiktokTrends.map((t: TikTokTrendItem, i: number) => ({
         keyword: t.keyword,
         growth: t.growth,
         type: 'TikTok',
@@ -36,7 +36,7 @@ export async function GET() {
     ];
 
     return NextResponse.json({ success: true, trends: combined });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ success: false, error: stringifyError(error) }, { status: 500 });
   }
 }

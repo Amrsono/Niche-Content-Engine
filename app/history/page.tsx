@@ -6,23 +6,20 @@ import { useRouter } from "next/navigation";
 import { usePosts } from "@/lib/useLocalPosts";
 import { getAllAnalytics } from "@/lib/analytics";
 import { FloatingNav } from "@/app/components/FloatingNav";
-import type { Post } from "@/lib/types";
+import { sortPosts, searchPosts, calculatePostMetrics, type SortKey, type SortDir, type EnrichedPost } from "@/lib/sortPosts";
 import { Eye, MousePointer2, Calendar, Hash, ExternalLink, RefreshCw, TrendingUp, FileText, ArrowUp, ArrowDown } from "lucide-react";
 import styles from "./history.module.css";
 
-type SortKey = "publishedAt" | "views" | "adClicks" | "title";
-type SortDir = "asc" | "desc";
-
-interface PostWithAnalytics extends Post {
-  views: number;
-  adClicks: number;
+function SortIcon({ activeKey, currentKey, sortDir }: { activeKey: SortKey; currentKey: SortKey; sortDir: SortDir }) {
+  if (activeKey !== currentKey) return null;
+  return sortDir === 'desc' ? <ArrowDown size={13} /> : <ArrowUp size={13} />;
 }
 
 export default function HistoryPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
 
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map((e) => e.trim().toLowerCase()) || [];
   const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
   const isAdmin = isSignedIn && userEmail && adminEmails.includes(userEmail);
 
@@ -33,56 +30,28 @@ export default function HistoryPage() {
   }, [isLoaded, isAdmin, router]);
 
   const { posts, refresh, isLoading } = usePosts();
-  const [analytics, setAnalytics] = useState<Record<string, { views: number; adClicks: number }>>({});
+  const [analytics] = useState<Record<string, { views: number; adClicks: number }>>(() => getAllAnalytics());
   const [sortKey, setSortKey] = useState<SortKey>("publishedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState("");
 
-  useEffect(() => {
-    setAnalytics(getAllAnalytics());
-  }, []);
-
-  const enriched: PostWithAnalytics[] = posts.map((p) => ({
+  const enriched: EnrichedPost[] = posts.map((p) => ({
     ...p,
     views: analytics[p.slug]?.views ?? 0,
     adClicks: analytics[p.slug]?.adClicks ?? 0,
   }));
 
-  const filtered = enriched.filter(
-    (p) =>
-      p.title.toLowerCase().includes(filter.toLowerCase()) ||
-      p.keyword.toLowerCase().includes(filter.toLowerCase())
-  );
-
-  const sorted = [...filtered].sort((a, b) => {
-    let aVal: any = a[sortKey];
-    let bVal: any = b[sortKey];
-    if (sortKey === "publishedAt") {
-      aVal = new Date(aVal).getTime();
-      bVal = new Date(bVal).getTime();
-    }
-    if (typeof aVal === "string") aVal = aVal.toLowerCase();
-    if (typeof bVal === "string") bVal = bVal.toLowerCase();
-    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
+  const filtered = searchPosts(enriched, filter);
+  const sorted = sortPosts(filtered, sortKey, sortDir);
+  const { totalViews, totalClicks, avgCtr } = calculatePostMetrics(enriched);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("desc"); }
+    else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
   };
-
-  const totalViews = enriched.reduce((s, p) => s + p.views, 0);
-  const totalClicks = enriched.reduce((s, p) => s + p.adClicks, 0);
-  const avgCtr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : "0.0";
-
-  const SortIcon = ({ k }: { k: SortKey }) =>
-    sortKey !== k ? null : sortDir === "desc" ? (
-      <ArrowDown size={13} />
-    ) : (
-      <ArrowUp size={13} />
-    );
 
   return (
     <main className={styles.main}>
@@ -140,26 +109,26 @@ export default function HistoryPage() {
                 className={`${styles.th} ${styles.sortable}`}
                 onClick={() => toggleSort("title")}
               >
-                Title <SortIcon k="title" />
+                Title <SortIcon activeKey={sortKey} currentKey="title" sortDir={sortDir} />
               </th>
               <th className={styles.th}>Keyword</th>
               <th
                 className={`${styles.th} ${styles.sortable}`}
                 onClick={() => toggleSort("publishedAt")}
               >
-                Date <SortIcon k="publishedAt" />
+                Date <SortIcon activeKey={sortKey} currentKey="publishedAt" sortDir={sortDir} />
               </th>
               <th
                 className={`${styles.th} ${styles.sortable} ${styles.centered}`}
                 onClick={() => toggleSort("views")}
               >
-                <Eye size={14} /> Views <SortIcon k="views" />
+                <Eye size={14} /> Views <SortIcon activeKey={sortKey} currentKey="views" sortDir={sortDir} />
               </th>
               <th
                 className={`${styles.th} ${styles.sortable} ${styles.centered}`}
                 onClick={() => toggleSort("adClicks")}
               >
-                <MousePointer2 size={14} /> Clicks <SortIcon k="adClicks" />
+                <MousePointer2 size={14} /> Clicks <SortIcon activeKey={sortKey} currentKey="adClicks" sortDir={sortDir} />
               </th>
               <th className={`${styles.th} ${styles.centered}`}>CTR</th>
               <th className={styles.th}>Status</th>

@@ -1,41 +1,39 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost, PublishResult } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
 export async function POST(request: Request) {
   try {
     const { niche, count = 5 } = await request.json();
-    console.log(`[BATCH] CWD: ${process.cwd()}`);
-    console.log(`[BATCH] Starting bulk cycle for niche: ${niche} (Count: ${count})`);
+    logger.info(`Starting bulk cycle for niche: ${niche} (Count: ${count})`, 'BATCH');
     
     // 1. Discovery Phase
     const allTrends = await runTrendScraper(niche);
     const targetTrends = allTrends.slice(0, count);
     
-    const results = [];
-    
     const completedActions = [];
     
-    // 2. Sequential Generation (Prevents hitting rate limits in bulk mode)
+    // 2. Sequential Generation
     for (const [index, trend] of targetTrends.entries()) {
       try {
-        console.log(`[BATCH] Processing #${index + 1}/${targetTrends.length}: ${trend.keyword}`);
+        logger.info(`Processing #${index + 1}/${targetTrends.length}: ${trend.keyword}`, 'BATCH');
         
         // Generate Article
         const article = await generateArticle(trend.keyword);
         
-        // Generate Image (Static placeholder for now as per agents.ts)
+        // Generate Image
         const ogImageUrl = await generateOgImage(article.title, trend.keyword || niche);
         article.ogImageUrl = ogImageUrl;
         
         // Publish (Local Pulse Blog)
         const publishResult: PublishResult = await publishToLocal(article, trend.keyword, trend.niche || niche);
         
-        // Social Signal - Instagram, X/Twitter & TikTok
+        // Social Signal - manual via UI
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
         const absoluteUrl = `${siteUrl}${publishResult.url}`;
         
-        // Social publishing is now done strictly manually via the UI
         const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
         const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
         const tkResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
@@ -43,7 +41,6 @@ export async function POST(request: Request) {
         // Indexing (Fast-Track)
         const indexingResult = await requestIndexing(absoluteUrl);
         
-        // Save Social Links to Local Pulse if applicable
         if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
           await updatePost(publishResult.id, {
             instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
@@ -62,18 +59,16 @@ export async function POST(request: Request) {
           indexing: indexingResult.success
         });
 
-        // Longer cooldown between articles to respect free-tier RPM
         if (index < targetTrends.length - 1) {
-          console.log(`[BATCH] Cooling down for 15s...`);
+          logger.info('Cooling down for 15s between batch articles...', 'BATCH');
           await new Promise(resolve => setTimeout(resolve, 15000));
         }
-      } catch (err: any) {
-        completedActions.push({ keyword: trend.keyword, error: err.message });
+      } catch (err: unknown) {
+        completedActions.push({ keyword: trend.keyword, error: stringifyError(err) });
       }
     }
 
-    console.log(`[BATCH] Cycle Complete. Total: ${completedActions.length}. Successes: ${completedActions.filter(a => !a.error).length}`);
-    console.log(`[BATCH] Detailed Results:`, JSON.stringify(completedActions, null, 2));
+    logger.info(`Batch Cycle Complete. Total: ${completedActions.length}`, 'BATCH');
 
     return NextResponse.json({
       success: true,
@@ -81,8 +76,8 @@ export async function POST(request: Request) {
       totalProcessed: completedActions.length,
       results: completedActions
     });
-  } catch (error: any) {
-    console.error("[BATCH ERROR]", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Batch route exception', 'BATCH', error);
+    return NextResponse.json({ success: false, error: stringifyError(error) }, { status: 500 });
   }
 }

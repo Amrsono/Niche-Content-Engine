@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { FloatingNav } from '../components/FloatingNav';
 import { BentoBox } from '../components/BentoBox';
 import { 
-  BarChart3, 
   TrendingUp, 
   Users, 
   Eye, 
@@ -24,6 +23,12 @@ const metrics = [
   { title: 'CTR', value: '3.8%', change: '-0.4%', icon: MousePointer2, color: '#ffcc00' },
 ];
 
+interface TrendItem {
+  keyword: string;
+  growth: string;
+  type: string;
+}
+
 export default function AnalyticsPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
@@ -38,7 +43,7 @@ export default function AnalyticsPage() {
     }
   }, [isLoaded, isAdmin, router]);
 
-  const [targetNiches, setTargetNiches] = useState<any[]>([]);
+  const [targetNiches, setTargetNiches] = useState<TrendItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('24h');
 

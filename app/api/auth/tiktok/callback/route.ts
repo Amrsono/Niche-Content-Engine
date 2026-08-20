@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { saveSettings } from '@/lib/storage';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,7 +17,7 @@ export async function GET(request: Request) {
   const redirectUri = `${siteUrl}/api/auth/tiktok/callback`;
 
   try {
-    console.log(`[TIKTOK AUTH] Exchanging code for token...`);
+    logger.info('Exchanging code for TikTok token...', 'TIKTOK_AUTH');
     const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
       method: 'POST',
       headers: {
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     const data = await response.json();
 
     if (data.access_token) {
-      console.log(`[TIKTOK AUTH] ✅ Token received. Saving to storage.`);
+      logger.info('TikTok token received successfully', 'TIKTOK_AUTH');
       await saveSettings('tiktok_auth', {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
@@ -47,11 +49,11 @@ export async function GET(request: Request) {
       
       return NextResponse.redirect(`${siteUrl}/blog?tiktok=connected`);
     } else {
-      console.error('[TIKTOK AUTH ERROR]', JSON.stringify(data, null, 2));
+      logger.error('TikTok auth error response', 'TIKTOK_AUTH', data);
       return NextResponse.json(data, { status: 500 });
     }
-  } catch (error: any) {
-    console.error('[TIKTOK AUTH FETCH ERROR]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('TikTok auth fetch error', 'TIKTOK_AUTH', error);
+    return NextResponse.json({ error: stringifyError(error) }, { status: 500 });
   }
 }

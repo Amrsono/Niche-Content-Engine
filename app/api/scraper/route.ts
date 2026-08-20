@@ -1,27 +1,28 @@
 import { NextResponse } from 'next/server';
-import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, calculatePeakTime, updatePost, PublishResult } from '@/lib/agents';
+import { runTrendScraper, generateArticle, generateOgImage, publishToWordpress, publishToSanity, publishToLocal, calculatePeakTime, updatePost, PublishResult } from '@/lib/agents';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
 export async function POST(request: Request) {
   try {
     const { niche } = await request.json();
     
-    // 1. Discovery Phase (Trends & TikTok)
+    // 1. Discovery Phase
     const trends = await runTrendScraper(niche || 'All Trends');
     if (trends.length === 0) {
       return NextResponse.json({ message: "No high-growth, low-comp keywords found." });
     }
     
-    // Process the top "low-hanging fruit" keyword
     const targetKeyword = trends[0].keyword;
     
-    // 2. Reasoning Phase (Gemini 2.0 Ultra generation)
+    // 2. Reasoning Phase
     const draft = await generateArticle(targetKeyword);
     
-    // 3. SEO Auto-Optimization Phase (DALL-E 3 / Meta)
+    // 3. SEO Auto-Optimization Phase
     const ogImageUrl = await generateOgImage(draft.title, targetKeyword);
     draft.ogImageUrl = ogImageUrl;
     
-    // 4. Auto-Publisher Phase (Local by default, or WordPress/Sanity)
+    // 4. Auto-Publisher Phase
     const cmsProvider = request.headers.get('x-cms-provider');
     let publishResult: PublishResult;
     
@@ -33,13 +34,10 @@ export async function POST(request: Request) {
       publishResult = await publishToLocal(draft, targetKeyword, niche || 'General');
     }
     
-    // 5. Social Media Phase (Pulse across Instagram/X/TikTok)
-    // Social publishing is now done strictly manually via the UI
     const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
     const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
     const ttResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
 
-    // 6. Persistence Update (Link social posts to local storage if using local)
     if (publishResult.platform === 'Local-Pulse-Blog' && publishResult.id) {
       await updatePost(publishResult.id, {
         instagramUrl: igResult.status === 'success' ? igResult.url : undefined,
@@ -48,7 +46,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // 7. Scheduling (Peak Engagement)
     const scheduledAt = calculatePeakTime();
     
     return NextResponse.json({
@@ -65,13 +62,13 @@ export async function POST(request: Request) {
       scheduledAt,
       draftPreview: draft
     });
-  } catch (error: any) {
-    console.error("[SYSTEM ERROR]", error);
-    // Explicitly return the error message for debugging
+  } catch (error: unknown) {
+    logger.error('System error during scraping cycle', 'SCRAPER_API', error);
+    const message = stringifyError(error);
     return NextResponse.json({ 
       success: false, 
-      error: error.message || "An unexpected error occurred in the autonomous cycle",
-      details: error.toString() 
+      error: message || "An unexpected error occurred in the autonomous cycle",
+      details: String(error) 
     }, { status: 500 });
   }
 }

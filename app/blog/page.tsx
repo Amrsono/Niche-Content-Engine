@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { usePosts } from '@/lib/useLocalPosts';
 import type { Post } from '@/lib/types';
+import { filterPosts, type TimeFilter } from '@/lib/sortPosts';
 import styles from './blog.module.css';
 import { FloatingNav } from '../components/FloatingNav';
 import AdSenseDisplay from '../components/AdSenseDisplay';
-import { Instagram, X, Video, Share2, Loader2, Facebook } from 'lucide-react';
+import { Instagram, X, Video, Loader2, Facebook } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import SidebarAd from '../components/SidebarAd';
@@ -22,8 +23,9 @@ export default function BlogPage() {
   const [signaling, setSignaling] = useState<Record<string, boolean>>({});
   
   // Filtering state
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [signalError, setSignalError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleUpdate = () => refresh();
@@ -33,58 +35,30 @@ export default function BlogPage() {
 
   const handleSignal = async (slug: string, platform: 'twitter' | 'instagram' | 'tiktok' | 'facebook') => {
     try {
-      setSignaling(prev => ({ ...prev, [`${slug}-${platform}`]: true }));
+      setSignalError(null);
+      setSignaling((prev) => ({ ...prev, [`${slug}-${platform}`]: true }));
       const res = await fetch('/api/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, platform })
+        body: JSON.stringify({ slug, platform }),
       });
       const data = await res.json();
       if (data.success) {
         refresh();
       } else {
-        alert(`Social Signal Failed: ${data.error || 'Unknown error'}`);
+        setSignalError(`Social Signal Failed: ${data.error || 'Unknown error'}`);
       }
-    } catch (err) {
-      console.error('Signal Error:', err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSignalError(`Signal Error: ${msg}`);
     } finally {
-      setSignaling(prev => ({ ...prev, [`${slug}-${platform}`]: false }));
+      setSignaling((prev) => ({ ...prev, [`${slug}-${platform}`]: false }));
     }
   };
 
   // Derived data
-  const categories = ['all', ...Array.from(new Set(posts.map(p => p.category || 'General').filter(Boolean)))];
-
-  const filteredPosts = posts.filter(post => {
-    // 1. Time Filter
-    if (timeFilter !== 'all') {
-      const postDate = new Date(post.publishedAt);
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      
-      if (timeFilter === 'today') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (postDate < today) return false;
-      } else if (timeFilter === 'week') {
-        const lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        if (postDate < lastWeek) return false;
-      } else if (timeFilter === 'month') {
-        const lastMonth = new Date();
-        lastMonth.setMonth(lastMonth.getMonth() - 1);
-        if (postDate < lastMonth) return false;
-      }
-    }
-
-    // 2. Category Filter
-    if (categoryFilter !== 'all') {
-      const cat = post.category || 'General';
-      if (cat !== categoryFilter) return false;
-    }
-
-    return true;
-  });
+  const categories = ['all', ...Array.from(new Set(posts.map((p) => p.category || 'General').filter(Boolean)))];
+  const filteredPosts = filterPosts(posts, timeFilter, categoryFilter);
 
   return (
     <main className={styles.blogContainer}>
@@ -109,15 +83,21 @@ export default function BlogPage() {
               )}
             </header>
 
+            {signalError && (
+              <div className="p-3 my-2 text-sm text-red-400 bg-red-950/40 border border-red-800 rounded">
+                {signalError}
+              </div>
+            )}
+
             {/* Filter Controls */}
             <div className={styles.filterSection}>
               <div className={styles.filterGroup}>
                 <span className={styles.filterLabel}>Time Range</span>
                 <div className={styles.filterOptions}>
-                  {['all', 'today', 'week', 'month'].map(t => (
+                  {(['all', 'today', 'week', 'month'] as TimeFilter[]).map((t) => (
                     <button 
                       key={t}
-                      onClick={() => setTimeFilter(t as any)}
+                      onClick={() => setTimeFilter(t)}
                       className={`${styles.filterTab} ${timeFilter === t ? styles.active : ''}`}
                     >
                       {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -129,7 +109,7 @@ export default function BlogPage() {
               <div className={styles.filterGroup}>
                 <span className={styles.filterLabel}>Category</span>
                 <div className={styles.filterOptions}>
-                  {categories.map(c => (
+                  {categories.map((c) => (
                     <button 
                       key={c}
                       onClick={() => setCategoryFilter(c)}
@@ -162,7 +142,6 @@ export default function BlogPage() {
                         <SmartImage 
                           initialSrc={(() => {
                             const u = post.ogImageUrl || FALLBACK_IMG;
-                            // Check if it's already proxied to avoid double-proxy loops
                             if (u.startsWith('/api/image-proxy') || u.includes('%2Fapi%2Fimage-proxy')) {
                               return u;
                             }
@@ -282,7 +261,6 @@ export default function BlogPage() {
               </div>
             )}
 
-            {/* Display ad below posts grid */}
             {filteredPosts.length > 0 && <AdSenseDisplay />}
           </div>
         </div>

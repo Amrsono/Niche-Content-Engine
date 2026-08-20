@@ -10,8 +10,12 @@ interface AdSenseDisplayProps {
 export default function AdSenseDisplay({ style }: AdSenseDisplayProps) {
   useEffect(() => {
     try {
-      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-    } catch (e) {}
+      const win = window as unknown as { adsbygoogle?: unknown[] };
+      win.adsbygoogle = win.adsbygoogle || [];
+      win.adsbygoogle.push({});
+    } catch {
+      // Ignored for ad blockers
+    }
   }, []);
 
   return (

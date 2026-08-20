@@ -26,7 +26,7 @@ export default function TermsPage() {
 
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing or using The Niche Content Engine ("the Platform"), you agree to be bound by 
+            By accessing or using The Niche Content Engine (&quot;the Platform&quot;), you agree to be bound by 
             these Terms of Service. If you do not agree to these terms, do not use the Platform.
           </p>
 
@@ -44,7 +44,7 @@ export default function TermsPage() {
 
           <h2>3. Intellectual Property</h2>
           <p>
-            The software, AI agent logic, and "System Pulse" dashboard are the intellectual property of 
+            The software, AI agent logic, and &quot;System Pulse&quot; dashboard are the intellectual property of 
             the Platform. The content generated (articles, images) is licensed to you for use on your 
             connected blogs and social media profiles.
           </p>

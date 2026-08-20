@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logger } from "@/lib/logger";
+import { stringifyError } from "@/lib/ai/utils";
 
 export async function POST(req: Request) {
   try {
@@ -11,19 +13,18 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Explicitly using the model name without v1beta alias if possible
     const model = genAI.getGenerativeModel({ model: modelName });
     
-    // Very simple request to test connectivity
     const result = await model.generateContent("Say 'Ready'");
     const text = result.response.text();
 
     return NextResponse.json({ success: true, text });
-  } catch (error: any) {
-    console.error(`[DIAGNOSTIC ERROR] ${error.message}`);
+  } catch (error: unknown) {
+    const message = stringifyError(error);
+    logger.error('Diagnostic error', 'DIAGNOSTIC', error);
     return NextResponse.json({ 
       success: false, 
-      error: error.message 
+      error: message 
     }, { status: 500 });
   }
 }

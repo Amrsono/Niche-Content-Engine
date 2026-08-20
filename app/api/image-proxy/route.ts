@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Proxies images from Pollinations.ai to ensure a stable, 
- * correctly-headed image/jpeg response for Instagram/Meta.
- * Added: Resilience system that returns a premium SVG placeholder on failure/timeout.
+ * correctly-headed image/jpeg response.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,21 +16,19 @@ export async function GET(request: Request) {
     return new NextResponse('Missing URL parameter', { status: 400 });
   }
 
-  // PREVENT LOOPS: If it accidentally tries to proxy itself, stop it.
+  // PREVENT LOOPS
   if (imageUrl.startsWith('/api/image-proxy') || imageUrl.includes('localhost')) {
     return createPlaceholderSvg("Local Path Detected", "700", "400");
   }
 
-  // Remove deprecated API key if present, because the key is expired and causes 401 Unauthorized
+  // Remove deprecated API key if present
   if (imageUrl.includes('pollinations.ai') && imageUrl.includes('key=')) {
     imageUrl = imageUrl.replace(/&key=[^&]*/, '').replace(/\?key=[^&]*&/, '?').replace(/\?key=[^&]*$/, '');
   }
 
   try {
-    console.log(`[IMAGE-PROXY] Fetching: ${imageUrl}`);
+    logger.debug(`Proxying image: ${imageUrl}`, 'IMAGE_PROXY');
     
-    // 2.5 SECOND TIMEOUT: Don't let slow AI generation block the UI/Scraper
-    // We race a fetch against a timeout but DO NOT abort the fetch so the generation completes.
     const fetchPromise = fetch(imageUrl, {
       headers: { 'Accept': 'image/*' }
     });
@@ -58,10 +57,9 @@ export async function GET(request: Request) {
         'X-Proxy-Source': 'Pollinations-Stable-Proxy'
       },
     });
-  } catch (error: any) {
-    console.error(`[IMAGE-PROXY RESILIENCE] ${error.message}. Returning placeholder.`);
+  } catch (error: unknown) {
+    logger.warn(`Image proxy failed (${stringifyError(error)}), returning placeholder`, 'IMAGE_PROXY');
     
-    // Return a beautiful, themed SVG instead of a 500 error
     const titleFromPrompt = imageUrl.split('/image/')[1]?.split('?')[0] || "Pulse AI Content";
     const cleanTitle = decodeURIComponent(titleFromPrompt).replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 40);
     
@@ -69,9 +67,6 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- * Builds a premium, abstract SVG placeholder that matches the Pulse theme.
- */
 function createPlaceholderSvg(title: string, width: string, height: string) {
   const svg = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
@@ -85,17 +80,12 @@ function createPlaceholderSvg(title: string, width: string, height: string) {
         </filter>
       </defs>
       <rect width="100%" height="100%" fill="url(#g)" />
-      
-      <!-- Abstract shapes for premium feel -->
       <circle cx="10%" cy="10%" r="20%" fill="#3b82f6" opacity="0.1" filter="url(#f)" />
       <circle cx="90%" cy="90%" r="30%" fill="#ec4899" opacity="0.1" filter="url(#f)" />
       <rect x="20%" y="30%" width="60%" height="5%" fill="#3b82f6" opacity="0.3" rx="10" />
-      
-      <!-- Pulse Loading Indicator style -->
       <rect x="50%" y="45%" width="2" height="10%" fill="white" opacity="0.5">
          <animate attributeName="opacity" values="0.1;1;0.1" dur="2s" repeatCount="indefinite" />
       </rect>
-
       <text x="50%" y="60%" font-family="system-ui, sans-serif" font-weight="700" font-size="32" fill="white" text-anchor="middle" opacity="0.8">
         ${title}
       </text>

@@ -2,19 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { batchRequestIndexing, getIndexingStatus } from '@/lib/indexing';
 import { getPosts } from '@/lib/storage';
+import { isUserAdmin } from '@/lib/env';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
-function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const adminEmails =
-    process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map((e) => e.trim().toLowerCase()) || [];
-  return adminEmails.includes(email.toLowerCase());
-}
-
-/**
- * POST /api/indexing
- * Submits one or more blog URLs to the Google Indexing API for fast-track crawling.
- * Body: { urls?: string[], mode?: 'custom' | 'all' | 'latest' }
- */
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
@@ -25,14 +16,13 @@ export async function POST(request: Request) {
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
 
-    if (!isAdminEmail(email)) {
+    if (!isUserAdmin(email)) {
       return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));
     const mode: string = body.mode || 'custom';
-    const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
 
     let urls: string[] = [];
 
@@ -45,7 +35,6 @@ export async function POST(request: Request) {
         urls = [`${siteUrl}/blog/${posts[0].slug}`];
       }
     } else {
-      // 'custom' mode — caller provides explicit URLs
       urls = Array.isArray(body.urls) ? body.urls : [];
     }
 
@@ -54,18 +43,14 @@ export async function POST(request: Request) {
     }
 
     const result = await batchRequestIndexing(urls);
-
     return NextResponse.json({ success: true, ...result });
-  } catch (err: any) {
-    console.error('[API /indexing] Error:', err.message);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = stringifyError(err);
+    logger.error('Indexing API error', 'API/INDEXING', err);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 
-/**
- * GET /api/indexing?url=<encoded-url>
- * Check the Google Indexing API status/metadata for a specific URL.
- */
 export async function GET(request: Request) {
   try {
     const { userId } = await auth();
@@ -76,7 +61,7 @@ export async function GET(request: Request) {
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
 
-    if (!isAdminEmail(email)) {
+    if (!isUserAdmin(email)) {
       return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
     }
 
@@ -89,7 +74,8 @@ export async function GET(request: Request) {
 
     const status = await getIndexingStatus(decodeURIComponent(url));
     return NextResponse.json({ success: true, data: status });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = stringifyError(err);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

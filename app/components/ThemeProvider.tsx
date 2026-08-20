@@ -11,22 +11,24 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  const saved = localStorage.getItem('niche-engine-theme') as Theme | null;
+  return saved || 'dark';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem('niche-engine-theme') as Theme;
-    if (savedTheme) {
-      setThemeState(savedTheme);
-      document.body.setAttribute('data-theme', savedTheme);
-      document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
-    } else {
-      document.body.setAttribute('data-theme', 'dark');
-      document.documentElement.style.colorScheme = 'dark';
-    }
-  }, []);
+    const frame = requestAnimationFrame(() => {
+      setMounted(true);
+      document.body.setAttribute('data-theme', theme);
+      document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -35,9 +37,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.colorScheme = newTheme === 'dark' ? 'dark' : 'light';
   };
 
-  // To prevent hydration mismatch, we strictly render the provider
-  // The layout will flash white/dark momentarily if not using a head script, 
-  // but this ensures full React consistency.
   if (!mounted) {
     return <div style={{ visibility: 'hidden' }}>{children}</div>;
   }
@@ -52,8 +51,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    // Safe fallback during SSR/static generation
-    return { theme: 'dark' as Theme, setTheme: (_: Theme) => {} };
+    return { theme: 'dark' as Theme, setTheme: () => {} };
   }
   return context;
 }

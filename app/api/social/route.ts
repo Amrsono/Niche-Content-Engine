@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { getPostBySlug, updatePost } from '@/lib/storage';
 import { publishToInstagram, publishToTwitter, publishToTikTok, publishToFacebook } from '@/lib/agents';
 import type { Post } from '@/lib/types';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -11,22 +13,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { postId, platform, slug } = await request.json();
+    const { platform, slug } = await request.json();
     const origin = request.headers.get('origin') || `http://${request.headers.get('host')}` || 'http://localhost:3000';
 
     if (!slug || !platform) {
       return NextResponse.json({ success: false, error: 'Missing slug or platform' }, { status: 400 });
     }
 
-    // 1. Get the post
     const post = await getPostBySlug(slug);
     if (!post) {
       return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 });
     }
 
-    console.log(`[SOCIAL API] Signaling ${platform} for: ${post.title}`);
+    logger.info(`Signaling ${platform} for: ${post.title}`, 'SOCIAL_API');
 
-    let result;
     const article = {
       title: post.title,
       content: post.content,
@@ -34,10 +34,8 @@ export async function POST(request: Request) {
       ogImageUrl: post.ogImageUrl
     };
 
-    // 2. Trigger the agent
     const blogUrl = `${origin}/blog/${post.slug}`;
-    console.log(`[SOCIAL API DEBUG] Origin: ${origin}`);
-    console.log(`[SOCIAL API DEBUG] Blog URL: ${blogUrl}`);
+    let result;
     
     if (platform === 'twitter') {
       result = await publishToTwitter(article, blogUrl);
@@ -51,7 +49,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid platform' }, { status: 400 });
     }
 
-    // 3. Update the post if successful
     if (result.status === 'success' && result.url) {
       const updates: Partial<Post> = {};
       if (platform === 'twitter') updates.twitterUrl = result.url;
@@ -69,8 +66,8 @@ export async function POST(request: Request) {
       status: result.status 
     });
 
-  } catch (error: any) {
-    console.error('[SOCIAL API ERROR]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Social API error', 'SOCIAL_API', error);
+    return NextResponse.json({ success: false, error: stringifyError(error) }, { status: 500 });
   }
 }

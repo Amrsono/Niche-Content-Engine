@@ -1,6 +1,15 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal, Play, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Terminal, Play, Loader2 } from 'lucide-react';
+import { stringifyError } from '@/lib/ai/utils';
+
+interface BatchItemResult {
+  keyword: string;
+  title?: string;
+  url?: string;
+  indexing?: boolean;
+  error?: string;
+}
 
 interface LogEntry {
   text: string;
@@ -43,7 +52,7 @@ export function PulseTerminal() {
         const data = await response.json();
         
         if (data.success) {
-          data.results.forEach((res: any) => {
+          data.results.forEach((res: BatchItemResult) => {
             if (res.error) {
               addLog(`[ERROR] ${res.keyword}: ${res.error}`, 'error');
             } else {
@@ -51,7 +60,7 @@ export function PulseTerminal() {
               if (res.indexing) addLog(`[INDEXING] Google notified via API.`, 'info');
             }
           });
-          const successCount = data.results.filter((r: any) => !r.error).length;
+          const successCount = data.results.filter((r: BatchItemResult) => !r.error).length;
           addLog(`Bulk operation complete. ${successCount}/${data.totalProcessed} articles ready.`, successCount > 0 ? 'system' : 'error');
         } else {
           throw new Error(data.error || "Batch failed");
@@ -106,8 +115,8 @@ export function PulseTerminal() {
         // Optional: Dispatch event to refresh usePosts hook if needed
         window.dispatchEvent(new Event('posts-updated'));
       }
-    } catch (err: any) {
-      addLog(`[ERROR] ${err.message}`, 'error');
+    } catch (err: unknown) {
+      addLog(`[ERROR] ${stringifyError(err)}`, 'error');
     } finally {
       setIsProcessing(false);
     }

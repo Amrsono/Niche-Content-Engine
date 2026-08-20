@@ -7,45 +7,32 @@ interface SmartImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 }
 
 export default function SmartImage({ initialSrc, alt, className, style, ...props }: SmartImageProps) {
-  const [currentSrc, setCurrentSrc] = useState<string>(initialSrc);
+  const [loadedDirectSrc, setLoadedDirectSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-
-    // We start with the proxy URL (initialSrc) to get a fast < 2.5s SVG placeholder for the UI.
-    // In the background, if this is a proxy URL, we will directly ask the client's browser to connect
-    // to the real Pollinations endpoint. This completely bypasses backend timeout issues!
     let realUrl: string | null = null;
+
     try {
       const urlObj = new URL(initialSrc, window.location.origin);
       if (urlObj.pathname === '/api/image-proxy' || urlObj.pathname.includes('image-proxy')) {
         const extracted = urlObj.searchParams.get('url');
         if (extracted) {
-           realUrl = extracted;
+          realUrl = extracted;
         }
       }
-    } catch (e) {
-      console.error('[SmartImage] URL parse error:', e);
+    } catch {
+      // Direct URL or parse failure
     }
 
     if (realUrl) {
-      // Create a background image loader
       const img = new Image();
-      // When the full heavy AI generation image is completely generated and downloaded:
       img.onload = () => {
         if (mounted) {
-          // Swap the beautiful proxy SVG for the real image!
-          setCurrentSrc(realUrl!);
+          setLoadedDirectSrc(realUrl);
         }
       };
-      img.onerror = () => {
-        console.warn('[SmartImage] Failed to load the direct image, keeping placeholder.');
-      };
-      
-      // Fire the background network request
       img.src = realUrl;
-    } else {
-       setCurrentSrc(initialSrc);
     }
 
     return () => {
@@ -53,9 +40,12 @@ export default function SmartImage({ initialSrc, alt, className, style, ...props
     };
   }, [initialSrc]);
 
+  const displaySrc = loadedDirectSrc || initialSrc;
+
   return (
+    /* eslint-disable-next-line @next/next/no-img-element */
     <img 
-      src={currentSrc} 
+      src={displaySrc} 
       alt={alt || "Article Image"} 
       className={className}
       style={{ ...style, transition: 'opacity 0.5s ease-in-out' }}

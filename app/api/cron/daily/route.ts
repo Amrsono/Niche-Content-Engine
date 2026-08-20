@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getNextNiche, addDiscoveredTopics } from '@/lib/niche-manager';
-import { generateArticle, generateOgImage, publishToLocal, publishToInstagram, publishToTwitter, publishToTikTok, updatePost, PublishResult } from '@/lib/agents';
-import { fetchGoogleTrends, scrapeTikTokTrends } from '@/lib/scraper';
+import { generateArticle, generateOgImage, publishToLocal, updatePost, PublishResult } from '@/lib/agents';
+import { fetchGoogleTrends, scrapeTikTokTrends, GoogleTrendItem, TikTokTrendItem } from '@/lib/scraper';
 import { requestIndexing } from '@/lib/indexing';
+import { logger } from '@/lib/logger';
+import { stringifyError } from '@/lib/ai/utils';
 
-// Single Daily Cron for Vercel Hobby Limits
 export async function GET(request: Request) {
   try {
     // 1. Security Check
@@ -15,28 +16,32 @@ export async function GET(request: Request) {
       }
     }
 
-    console.log(`[CRON DAILY] Waking up for daily cycle...`);
+    logger.info('Waking up for daily cycle...', 'CRON_DAILY');
     
     // --- PART 1: DISCOVERY ---
-    console.log(`[CRON DAILY] Step 1: Discovering new trends...`);
+    logger.info('Step 1: Discovering new trends...', 'CRON_DAILY');
     try {
       const [googleTrends, tiktokTrends] = await Promise.all([
         fetchGoogleTrends(),
         scrapeTikTokTrends()
       ]);
       const keywords: string[] = [];
-      if (googleTrends && Array.isArray(googleTrends)) keywords.push(...googleTrends.slice(0, 5).map((t: any) => t.title as string));
-      if (tiktokTrends && Array.isArray(tiktokTrends)) keywords.push(...tiktokTrends.slice(0, 5).map((t: any) => t.keyword as string));
+      if (googleTrends && Array.isArray(googleTrends)) {
+        keywords.push(...googleTrends.slice(0, 5).map((t: GoogleTrendItem) => t.title));
+      }
+      if (tiktokTrends && Array.isArray(tiktokTrends)) {
+        keywords.push(...tiktokTrends.slice(0, 5).map((t: TikTokTrendItem) => t.keyword));
+      }
       
       await addDiscoveredTopics(keywords);
     } catch (e) {
-      console.warn(`[CRON DAILY] Discovery phase failed, but continuing to publish...`, e);
+      logger.warn('Discovery phase failed, continuing to publish', 'CRON_DAILY', e);
     }
 
     // --- PART 2: PUBLISHING ---
-    console.log(`[CRON DAILY] Step 2: Publishing new article...`);
+    logger.info('Step 2: Publishing new article...', 'CRON_DAILY');
     const keyword = await getNextNiche();
-    console.log(`[CRON DAILY] Selected topic: ${keyword}`);
+    logger.info(`Selected topic: ${keyword}`, 'CRON_DAILY');
 
     const article = await generateArticle(keyword);
     article.ogImageUrl = await generateOgImage(article.title, keyword);
@@ -46,7 +51,6 @@ export async function GET(request: Request) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://niche-content-engine.vercel.app';
     const absoluteUrl = `${siteUrl}${publishResult.url}`;
     
-    // Social publishing is now done strictly manually via the UI
     const igResult: PublishResult = { status: 'skipped', platform: 'Instagram' };
     const xResult: PublishResult = { status: 'skipped', platform: 'X/Twitter' };
     const tkResult: PublishResult = { status: 'skipped', platform: 'TikTok' };
@@ -75,8 +79,8 @@ export async function GET(request: Request) {
       }
     });
 
-  } catch (error: any) {
-    console.error("[CRON DAILY ERROR]", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Daily cron error', 'CRON_DAILY', error);
+    return NextResponse.json({ success: false, error: stringifyError(error) }, { status: 500 });
   }
 }
