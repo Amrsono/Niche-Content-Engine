@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Flame, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logger } from '@/lib/logger';
 
 interface Trend {
   keyword: string;
@@ -25,7 +26,7 @@ export function TrendHeatmap() {
           setTrends(data.trends);
         }
       } catch (err) {
-        console.error("Heatmap fetch failed:", err);
+        logger.error("Heatmap fetch failed", "TrendHeatmap", err);
       } finally {
         setLoading(false);
       }
