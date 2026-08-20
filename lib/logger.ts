@@ -1,7 +1,10 @@
 /**
  * Structured Logger for Niche-Content-Engine
- * Provides uniform timestamps, levels, and context metadata.
+ * Provides uniform timestamps, levels, and context metadata,
+ * integrated with production error tracking.
  */
+
+import { captureException } from './errorTracking';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -50,6 +53,13 @@ class StructuredLogger {
       case 'error':
         if (data !== undefined) console.error(formatted, data);
         else console.error(formatted);
+
+        // Forward to error tracking client
+        try {
+          captureException(data || new Error(message), { module: context });
+        } catch {
+          // Prevent error tracking failures from impacting logging
+        }
         break;
     }
   }

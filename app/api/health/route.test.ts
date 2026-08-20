@@ -8,8 +8,12 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(200);
     expect(data.status).toBe('healthy');
-    expect(data.version).toBeDefined();
+    expect(data.version).toBe('1.1.0');
+    expect(data.hasHealthEndpoint).toBe(true);
     expect(data.features).toBeDefined();
+    expect(data.features.ai).toBeDefined();
+    expect(data.features.storage).toBeDefined();
+    expect(data.features.errorTracking).toBeDefined();
     expect(typeof data.uptimeSeconds).toBe('number');
   });
 });
