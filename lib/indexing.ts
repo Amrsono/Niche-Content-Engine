@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { logger } from './logger';
+import { captureException } from './errorTracking';
 import { stringifyError } from './ai/utils';
 
 const DAILY_QUOTA = 200; // Google's Indexing API limit
@@ -24,6 +25,7 @@ async function getIndexingClient() {
     return google.indexing({ version: 'v3', auth: client as never });
   } catch (err: unknown) {
     logger.error('Failed to build Google Indexing auth client', 'INDEXING', err);
+    captureException(err, { module: 'INDEXING' });
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import { fetchGoogleTrends, scrapeTikTokTrends } from './scraper';
 import { savePost, updatePost } from './storage';
 import { logger } from './logger';
+import { captureException } from './errorTracking';
 import { env } from './env';
 import { safeJsonParse, cleanResult, stringifyError, delay } from './ai/utils';
 import { GROQ_MODELS } from './ai/providers/groq';
@@ -71,6 +72,7 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
     return (data.trends || []).map((t) => ({ ...t, niche }));
   } catch (err: unknown) {
     logger.error('Real-time Discovery failed', 'DISCOVERY', err);
+    captureException(err, { module: 'DISCOVERY' });
     throw new Error(`Real-time Discovery failed: ${stringifyError(err)}`);
   }
 }
@@ -194,6 +196,7 @@ Return JSON with: "title" (max 70 chars) and "metaDescription" (max 160 chars).`
     };
   } catch (err: unknown) {
     logger.error('Multi-Pass Reasoning failed', 'REASONING', err);
+    captureException(err, { module: 'REASONING' });
     throw new Error(`Multi-Pass Reasoning failed: ${stringifyError(err)}`);
   }
 }
