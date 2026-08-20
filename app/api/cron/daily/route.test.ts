@@ -51,13 +51,12 @@ function makeRequest(authHeader?: string): Request {
 describe('GET /api/cron/daily', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.CRON_SECRET;
-    delete process.env.NODE_ENV;
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 in production when CRON_SECRET is set and header is missing', async () => {
-    process.env.CRON_SECRET = 'supersecret';
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('CRON_SECRET', 'supersecret');
+    vi.stubEnv('NODE_ENV', 'production');
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(401);
@@ -66,16 +65,16 @@ describe('GET /api/cron/daily', () => {
   });
 
   it('returns 401 in production when authorization header is wrong', async () => {
-    process.env.CRON_SECRET = 'supersecret';
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('CRON_SECRET', 'supersecret');
+    vi.stubEnv('NODE_ENV', 'production');
 
     const res = await GET(makeRequest('Bearer wrongtoken'));
     expect(res.status).toBe(401);
   });
 
   it('proceeds normally in production with correct CRON_SECRET', async () => {
-    process.env.CRON_SECRET = 'supersecret';
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('CRON_SECRET', 'supersecret');
+    vi.stubEnv('NODE_ENV', 'production');
 
     const res = await GET(makeRequest('Bearer supersecret'));
     expect(res.status).toBe(200);
@@ -85,8 +84,8 @@ describe('GET /api/cron/daily', () => {
   });
 
   it('allows request in development even without authorization header', async () => {
-    process.env.CRON_SECRET = 'supersecret';
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('CRON_SECRET', 'supersecret');
+    vi.stubEnv('NODE_ENV', 'development');
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(200);
