@@ -4,7 +4,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.0-black.svg)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2.4-61dafb.svg)](https://react.dev/)
-[![Tests](https://img.shields.io/badge/Tests-Vitest%20%7C%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-130%20Passing%20%7C%2076%25%20Coverage-brightgreen.svg)](https://vitest.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 
 > **Niche Content Engine** is an autonomous, AI-driven content generation, SEO optimization, and multi-platform social media distribution suite built on Next.js 16 and React 19.
 
@@ -16,11 +17,12 @@ The platform uses a coordinated multi-agent workflow that turns real-time trendi
 
 ```mermaid
 graph TD
-    A[Discovery Agent\nGoogle Trends & TikTok Signals] --> B[Reasoning Agent\nMulti-Pass Editorial Writer]
-    B --> C[SEO & Visual Agent\nDALL-E 3 / Pollinations]
-    C --> D[Publisher Agent\nLocal Storage / WordPress / Sanity]
-    D --> E[Fast-Track Indexer\nGoogle Indexing API v3]
-    D --> F[Social Distribution\nTikTok, X, Instagram, Facebook]
+    A[Discovery Agent\nGoogle Trends & TikTok Signals] --> B[AI Dispatcher\nMulti-LLM Fallback Manager]
+    B --> C[Reasoning Agent\nMulti-Pass Editorial Generator]
+    C --> D[SEO & Visual Agent\nDALL-E 3 / Pollinations]
+    D --> E[Publisher Agent\nLocal / WordPress / Sanity]
+    E --> F[Fast-Track Indexer\nGoogle Indexing API v3]
+    E --> G[Social Signaling\nCaptions Engine: TikTok, X, IG, FB]
 ```
 
 ### Key Capabilities
@@ -47,22 +49,29 @@ graph TD
 │   │   ├── scraper/            # Autonomous single-keyword cycle runner
 │   │   └── social/             # Individual social media signaling
 │   ├── blog/                   # Public blog listing & dynamic article reader
+│   ├── components/             # Reusable UI widgets & AdminGuard
+│   ├── hooks/                  # Client custom hooks (useAdminGuard)
 │   └── history/                # Generated post table with sorting & CTR analytics
 ├── lib/
 │   ├── ai/
 │   │   ├── providers/          # Groq, Gemini, and OpenAI modular clients
+│   │   ├── dispatcher.ts       # Cooldown manager & fallback retry engine
 │   │   ├── types.ts            # Strict AI & generation interfaces
 │   │   └── utils.ts            # Safe JSON parsing & text cleaners
+│   ├── social/captions.ts      # Multi-platform caption & hashtag generator
 │   ├── tiktok/token.ts         # TikTok OAuth token refresh & buffer logic
-│   ├── agents.ts               # Core orchestrator (<400 LOC)
+│   ├── agents.ts               # Clean orchestrator (<350 LOC)
 │   ├── env.ts                  # Zod environment variable validation
+│   ├── validation.ts           # Zod API request schemas
 │   ├── logger.ts               # Structured logger (info, warn, error, debug)
 │   ├── sortPosts.ts            # Pure sorting, time filtering & CTR calculators
 │   └── storage.ts              # Redis / filesystem post persistence
 ├── .github/
-│   ├── workflows/ci.yml        # CI Pipeline (Lint, Typecheck, Test, Build, Audit)
+│   ├── workflows/ci.yml        # Hardened CI Pipeline (Lint, Typecheck, Test, Coverage, Audit, Build)
 │   └── dependabot.yml          # Automated weekly dependency updates
-├── vitest.config.mjs           # Vitest unit & component test configuration
+├── Dockerfile                  # Production Alpine container
+├── docker-compose.yml          # One-command app + Redis container stack
+├── vitest.config.mjs           # Vitest unit & component test configuration with 70%+ coverage gate
 └── SECURITY.md                 # Security policy & admin authorization model
 ```
 
@@ -96,22 +105,24 @@ cp .env.example .env.local
 
 ## 🚀 Quick Start
 
-### 1. Clone & Install
+### Option A: Local Development
 ```bash
+# 1. Clone & Install
 git clone https://github.com/Amrsono/Niche-Content-Engine.git
 cd Niche-Content-Engine
 npm install
-```
 
-### 2. Configure Environment
-```bash
+# 2. Configure Environment
 cp .env.example .env.local
-# Add your GROQ_API_KEY and other provider credentials to .env.local
+
+# 3. Run Development Server
+npm run dev
 ```
 
-### 3. Run Development Server
+### Option B: Docker Compose (One-Command Startup)
 ```bash
-npm run dev
+# Build and start the app with isolated Redis service
+docker compose up --build
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -119,14 +130,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🧪 Testing & Verification
 
-Niche Content Engine includes an automated test suite powered by **Vitest** and **React Testing Library**:
+Niche Content Engine includes an automated test suite powered by **Vitest** and **React Testing Library** with an enforced 70%+ coverage gate:
 
 ```bash
-# Run unit & component tests
+# Run unit & component tests (130 specs)
 npm test
 
-# Run tests in watch mode
-npm run test:watch
+# Run tests with code coverage report
+npm run test:coverage
 
 # TypeScript typecheck
 npm run typecheck

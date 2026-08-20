@@ -30,12 +30,11 @@ jobs:
       - name: TypeScript Typecheck
         run: npm run typecheck
 
-      - name: Run Vitest Suite
-        run: npm test
+      - name: Run Tests with Coverage Gate (70%+)
+        run: npm run test:coverage
 
       - name: Security Dependency Audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --audit-level=critical
 
       - name: Build Next.js Application
         run: npm run build
