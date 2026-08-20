@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { requireServerAdmin } from '@/lib/adminGuard.server';
 import { runTrendScraper, generateArticle, generateOgImage, publishToLocal, updatePost, PublishResult } from '@/lib/agents';
 import { requestIndexing } from '@/lib/indexing';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
 import { BatchRequestSchema, validateRequestBody } from '@/lib/validation';
-import { isUserAdmin } from '@/lib/env';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await currentUser();
-    const email = user?.emailAddresses?.[0]?.emailAddress;
-    if (!isUserAdmin(email)) {
-      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
+    const adminCheck = await requireServerAdmin();
+    if (!adminCheck.authorized && adminCheck.errorResponse) {
+      return adminCheck.errorResponse;
     }
 
     const body = await request.json().catch(() => ({}));

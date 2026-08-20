@@ -1,24 +1,16 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { requireServerAdmin } from '@/lib/adminGuard.server';
 import { batchRequestIndexing, getIndexingStatus } from '@/lib/indexing';
 import { getPosts } from '@/lib/storage';
-import { isUserAdmin } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { stringifyError } from '@/lib/ai/utils';
 import { IndexingRequestSchema, validateRequestBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await currentUser();
-    const email = user?.emailAddresses?.[0]?.emailAddress;
-
-    if (!isUserAdmin(email)) {
-      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
+    const adminCheck = await requireServerAdmin();
+    if (!adminCheck.authorized && adminCheck.errorResponse) {
+      return adminCheck.errorResponse;
     }
 
     const body = await request.json().catch(() => ({}));
@@ -59,16 +51,9 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await currentUser();
-    const email = user?.emailAddresses?.[0]?.emailAddress;
-
-    if (!isUserAdmin(email)) {
-      return NextResponse.json({ success: false, error: 'Forbidden — admin only' }, { status: 403 });
+    const adminCheck = await requireServerAdmin();
+    if (!adminCheck.authorized && adminCheck.errorResponse) {
+      return adminCheck.errorResponse;
     }
 
     const { searchParams } = new URL(request.url);
