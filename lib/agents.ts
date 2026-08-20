@@ -3,13 +3,21 @@ import { savePost, updatePost } from './storage';
 import { logger } from './logger';
 import { env } from './env';
 import { safeJsonParse, cleanResult, stringifyError, delay } from './ai/utils';
-import { callGroqProvider, GROQ_MODELS, type GroqChatParams } from './ai/providers/groq';
-import { callGeminiProvider, GEMINI_MODELS } from './ai/providers/gemini';
-import { callOpenAIProvider, OPENAI_MODELS } from './ai/providers/openai';
+import { GROQ_MODELS } from './ai/providers/groq';
 import { getTikTokToken } from './tiktok/token';
-import type OpenAI from 'openai';
+import { callAIWithFallback } from './ai/dispatcher';
+import { generateHashtags, generateSocialCaption } from './social/captions';
 
-export { updatePost, safeJsonParse, cleanResult, stringifyError, getTikTokToken };
+export {
+  updatePost,
+  safeJsonParse,
+  cleanResult,
+  stringifyError,
+  getTikTokToken,
+  callAIWithFallback,
+  generateHashtags,
+  generateSocialCaption,
+};
 
 export interface TrendData {
   keyword: string;
@@ -31,167 +39,6 @@ export interface PublishResult {
   platform: string;
   id?: string;
   message?: string;
-}
-
-// Global Provider Cooldowns
-const providerCooldowns: Record<string, number> = {
-  groq: 0,
-  gemini: 0,
-  openai: 0,
-};
-
-const COOLDOWN_DURATION = 60000; // 60 seconds
-
-/**
- * Universal Multi-Provider AI Fallback Dispatcher
- */
-export async function callAIWithFallback(
-  options: GroqChatParams
-): Promise<{ text: string }> {
-  // 1. Model selection: Fast model for simple tasks
-  const isSimpleTask = (options.messages || []).some((m: { content?: unknown }) => {
-    const c = typeof m.content === 'string' ? m.content.toLowerCase() : '';
-    return c.includes('hashtag') || c.includes('meta description');
-  });
-
-  if (isSimpleTask && options.model === GROQ_MODELS.DISCOVERY) {
-    options.model = GROQ_MODELS.FAST;
-    logger.debug(`Using FAST_MODEL (${GROQ_MODELS.FAST}) for simple task`, 'AI');
-  }
-
-  const MAX_TRIES = 2;
-  let attempt = 0;
-
-  while (attempt < MAX_TRIES) {
-    try {
-      // 1. Try Groq (Primary)
-      if (Date.now() > providerCooldowns.groq && (env.GROQ_API_KEY || process.env.GROQ_API_KEY)) {
-        const response = await callGroqProvider(options);
-        const text = response.choices[0]?.message?.content || '';
-        return { text };
-      } else {
-        logger.warn('Groq unavailable or cooling down. Falling back to Gemini...', 'AI');
-        throw { status: 429 };
-      }
-    } catch (e: unknown) {
-      const err = e as { status?: number; message?: string };
-      if (err.status === 429) {
-        providerCooldowns.groq = Date.now() + COOLDOWN_DURATION;
-        attempt++;
-        if (attempt < MAX_TRIES) {
-          const waitTime = 15000 * attempt;
-          logger.warn(`Groq rate limited. Retrying in ${waitTime / 1000}s (Attempt ${attempt}/${MAX_TRIES})`, 'AI');
-          await delay(waitTime);
-          continue;
-        }
-
-        // 2. Try Gemini (Secondary)
-        if (Date.now() > providerCooldowns.gemini && (env.GEMINI_API_KEY || process.env.GEMINI_API_KEY)) {
-          try {
-            logger.info('Calling secondary fallback provider: Gemini...', 'AI');
-            const prompt = (options.messages || [])
-              .map((m: { role?: string; content?: unknown }) => `${m.role || 'user'}: ${String(m.content || '')}`)
-              .join('\n');
-            const text = await callGeminiProvider(prompt, GEMINI_MODELS.FLASH);
-            return { text };
-          } catch (gemError: unknown) {
-            logger.error('Gemini fallback failed', 'AI', gemError);
-            providerCooldowns.gemini = Date.now() + COOLDOWN_DURATION;
-
-            // 3. Try OpenAI (Tertiary)
-            if (Date.now() > providerCooldowns.openai && (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)) {
-              logger.warn('Calling tertiary fallback provider: OpenAI...', 'AI');
-              await delay(2000);
-              try {
-                const oaOptions: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-                  messages: options.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-                  model: OPENAI_MODELS.MINI,
-                };
-                const oaRes = await callOpenAIProvider(oaOptions);
-                const text = oaRes.choices[0]?.message?.content || '';
-                return { text };
-              } catch (oaError: unknown) {
-                providerCooldowns.openai = Date.now() + COOLDOWN_DURATION;
-                logger.error('OpenAI fallback failed', 'AI', oaError);
-                throw new Error(`CRITICAL: All AI providers exhausted. Latest error: ${stringifyError(oaError)}`);
-              }
-            }
-          }
-        }
-      }
-      throw new Error(`AI execution failed: ${stringifyError(e)}`);
-    }
-  }
-
-  throw new Error('AI call failed to return a valid response after all retries and fallbacks.');
-}
-
-/**
- * Generates 3-5 high-engagement hashtags based on article content.
- */
-export async function generateHashtags(title: string, content: string): Promise<string> {
-  try {
-    const res = await callAIWithFallback({
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a social media growth expert. Generate 3-5 highly relevant, trending hashtags for a post. Return ONLY the hashtags separated by spaces.',
-        },
-        {
-          role: 'user',
-          content: `Title: ${title}\nContent: ${content.substring(0, 500)}...`,
-        },
-      ],
-      model: GROQ_MODELS.FAST,
-    });
-    return res.text.trim() || '#niche #pulse2026 #contentengine';
-  } catch (err) {
-    logger.warn('Hashtag generation failed, using default tags', 'SOCIAL', err);
-    return '#niche #pulse2026 #contentengine';
-  }
-}
-
-/**
- * Generates a platform-optimized social media caption.
- */
-export async function generateSocialCaption(
-  platform: 'instagram' | 'twitter' | 'tiktok' | 'facebook',
-  title: string,
-  content: string,
-  blogUrl?: string
-): Promise<string> {
-  const hashtags = await generateHashtags(title, content);
-  const platformPrompts: Record<string, string> = {
-    instagram: "Create a world-class Instagram caption. Start with a 'thumb-stopping' hook. Use bullet points for value. End with a clear 'Link in Bio' CTA. Use relevant emojis.",
-    twitter: 'Create a high-engagement X (Twitter) post. Start with a viral-style hook. Include the link naturally. Be concise and sharp. Use 1-2 emojis max.',
-    tiktok: "Create a high-energy TikTok description. Rapid-fire hooks. Bullet points of 'what you'll learn'. Clear 'Link in Bio' CTA. Lots of energy and emojis.",
-    facebook: 'Create a compelling Facebook Page post. Focus on community engagement and storytelling. Use a strong headline hook. Use relevant emojis. End with a clear CTA.',
-  };
-
-  try {
-    const res = await callAIWithFallback({
-      messages: [
-        {
-          role: 'system',
-          content: `${platformPrompts[platform]} Return ONLY the caption text. Do NOT include placeholders like [Link Here]. For Instagram and TikTok, emphasize the BIO for the link. For Twitter, the link provided is ${blogUrl || 'your website'}.`,
-        },
-        {
-          role: 'user',
-          content: `Article Title: ${title}\nSummary: ${content.substring(0, 400)}...\nURL: ${blogUrl || 'Link in Bio'}`,
-        },
-      ],
-      model: GROQ_MODELS.FAST,
-    });
-
-    let caption = res.text.trim() || `${title}\n\n${content.substring(0, 100)}...`;
-    if (!caption.includes('#')) {
-      caption += `\n\n${hashtags}`;
-    }
-    return caption;
-  } catch (err) {
-    logger.warn(`Caption generation failed for ${platform}, using fallback.`, 'SOCIAL', err);
-    return `${title}\n\n🔗 ${blogUrl || 'Link in Bio'}\n\n${hashtags}`;
-  }
 }
 
 // 1. Discovery Agent
@@ -503,7 +350,6 @@ export async function publishToInstagram(article: DraftArticle, blogUrl?: string
   }
 }
 
-// Twitter OAuth & Publish
 function percentEncode(str: string) {
   return encodeURIComponent(str)
     .replace(/!/g, '%21')
