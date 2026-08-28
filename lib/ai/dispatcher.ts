@@ -55,7 +55,7 @@ export async function callAIWithFallback(
       const text = response.choices[0]?.message?.content || '';
       if (text) return { text };
     } catch (e: unknown) {
-      setProviderCooldown('groq');
+      setProviderCooldown('groq', 15000);
       logger.warn(`Groq provider failed (${stringifyError(e)}). Cooled down Groq and attempting fallback...`, 'AI');
     }
   }
@@ -64,7 +64,7 @@ export async function callAIWithFallback(
   const activeGeminiKey = await getActiveGeminiApiKey();
   if (Date.now() > providerCooldowns.gemini && activeGeminiKey) {
     let geminiAttempts = 0;
-    const MAX_GEMINI_ATTEMPTS = 2;
+    const MAX_GEMINI_ATTEMPTS = 3;
 
     while (geminiAttempts < MAX_GEMINI_ATTEMPTS) {
       try {
@@ -85,7 +85,7 @@ export async function callAIWithFallback(
           continue;
         }
 
-        setProviderCooldown('gemini', 30000);
+        setProviderCooldown('gemini', 15000);
         logger.error('Gemini fallback failed', 'AI', gemError);
         break;
       }
@@ -105,7 +105,7 @@ export async function callAIWithFallback(
       const text = oaRes.choices[0]?.message?.content || '';
       if (text) return { text };
     } catch (oaError: unknown) {
-      setProviderCooldown('openai');
+      setProviderCooldown('openai', 30000);
       logger.error('OpenAI fallback failed', 'AI', oaError);
       throw new Error(`CRITICAL: All AI providers exhausted. Latest error: ${stringifyError(oaError)}`);
     }
