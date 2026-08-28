@@ -30,6 +30,7 @@ vi.mock('./providers/gemini', () => {
       PRO: 'gemini-1.5-pro',
     },
     callGeminiProvider: vi.fn(),
+    getActiveGeminiApiKey: vi.fn().mockResolvedValue('mock-gemini-key'),
   };
 });
 
