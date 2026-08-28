@@ -15,8 +15,8 @@ vi.mock('./utils', async (importOriginal) => {
 vi.mock('./providers/groq', () => {
   return {
     GROQ_MODELS: {
-      DISCOVERY: 'llama-3.3-70b-versatile',
-      REASONING: 'llama-3.3-70b-versatile',
+      DISCOVERY: 'llama-3.1-8b-instant',
+      REASONING: 'llama-3.1-8b-instant',
       FAST: 'llama-3.1-8b-instant',
     },
     callGroqProvider: vi.fn(),

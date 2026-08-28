@@ -11,7 +11,7 @@ describe('AI Dedicated Providers', () => {
   });
 
   it('exposes standard model constants for discovery and fast inference', () => {
-    expect(GROQ_MODELS.DISCOVERY).toBe('llama-3.3-70b-versatile');
+    expect(GROQ_MODELS.DISCOVERY).toBe('llama-3.1-8b-instant');
     expect(GROQ_MODELS.FAST).toBe('llama-3.1-8b-instant');
     expect(GEMINI_MODELS.FLASH).toBe('gemini-2.5-flash');
     expect(OPENAI_MODELS.MINI).toBe('gpt-4o-mini');

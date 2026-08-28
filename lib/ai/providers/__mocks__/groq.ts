@@ -1,123 +1,102 @@
 import { vi } from 'vitest';
-import type { GroqChatParams, GroqChatResponse } from '../groq';
+import type { GroqChatResponse } from '../groq';
 
 export const GROQ_MODELS = {
-  DISCOVERY: 'llama-3.3-70b-versatile',
-  REASONING: 'llama-3.3-70b-versatile',
+  DISCOVERY: 'llama-3.1-8b-instant',
+  REASONING: 'llama-3.1-8b-instant',
   FAST: 'llama-3.1-8b-instant',
 } as const;
 
-export const callGroqProvider = vi.fn(async (params: GroqChatParams): Promise<GroqChatResponse> => {
-  const content = (params.messages || []).map((m) => String(m.content || '')).join(' ');
-  
-  if (content.includes('trends')) {
+export const callGroqProvider = vi.fn(async (params: any): Promise<GroqChatResponse> => {
+  const content = (params.messages || []).map((m: any) => m.content).join(' ');
+
+  if (content.includes('JSON with \'trends\'') || content.includes('Pick the top 3')) {
     return {
-      id: 'mock-groq-1',
+      id: 'mock-groq-id',
+      object: 'chat.completion',
+      created: Date.now(),
+      model: 'llama-3.1-8b-instant',
       choices: [
         {
           index: 0,
-          finish_reason: 'stop',
-          logprobs: null,
           message: {
             role: 'assistant',
             content: JSON.stringify({
               trends: [
-                { keyword: 'ai automation tools', searchVolume: 12000, competition: 'LOW' },
-                { keyword: 'nextjs 16 tutorial', searchVolume: 8500, competition: 'LOW' },
+                { keyword: 'Groq AI trend 1', searchVolume: 12000, competition: 'LOW' },
+                { keyword: 'Groq AI trend 2', searchVolume: 9500, competition: 'LOW' },
+                { keyword: 'Groq AI trend 3', searchVolume: 8000, competition: 'MEDIUM' },
               ],
             }),
           },
+          finish_reason: 'stop',
         },
       ],
-      created: Date.now(),
-      model: 'llama-3.3-70b-versatile',
-      object: 'chat.completion',
-    } as unknown as GroqChatResponse;
+    } as GroqChatResponse;
   }
 
-  if (content.includes('outline')) {
+  if (content.includes('sections') || content.includes('Create an outline')) {
     return {
-      id: 'mock-groq-2',
+      id: 'mock-groq-id',
+      object: 'chat.completion',
+      created: Date.now(),
+      model: 'llama-3.1-8b-instant',
       choices: [
         {
           index: 0,
-          finish_reason: 'stop',
-          logprobs: null,
           message: {
             role: 'assistant',
             content: JSON.stringify({
               sections: [
-                { title: 'The Rise of Intelligent Systems', targetWordCount: 500 },
-                { title: 'Future Implementations and Analysis', targetWordCount: 500 },
+                { title: 'Introduction to Topic', targetWordCount: 250 },
+                { title: 'Key Concepts & Features', targetWordCount: 300 },
+                { title: 'Practical Applications', targetWordCount: 250 },
+                { title: 'Conclusion & Next Steps', targetWordCount: 200 },
               ],
             }),
           },
+          finish_reason: 'stop',
         },
       ],
-      created: Date.now(),
-      model: 'llama-3.3-70b-versatile',
-      object: 'chat.completion',
-    } as unknown as GroqChatResponse;
+    } as GroqChatResponse;
   }
 
-  if (content.includes('headline')) {
+  if (content.includes('headline for an article') || content.includes('meta description')) {
     return {
-      id: 'mock-groq-3',
+      id: 'mock-groq-id',
+      object: 'chat.completion',
+      created: Date.now(),
+      model: 'llama-3.1-8b-instant',
       choices: [
         {
           index: 0,
-          finish_reason: 'stop',
-          logprobs: null,
           message: {
             role: 'assistant',
             content: JSON.stringify({
-              title: 'Next-Gen AI Automation in 2026',
-              metaDescription: 'A comprehensive guide to next-generation AI automation strategies.',
+              title: 'Groq Generated Unique Title',
+              metaDescription: 'Groq generated unique meta description for testing.',
             }),
           },
-        },
-      ],
-      created: Date.now(),
-      model: 'llama-3.3-70b-versatile',
-      object: 'chat.completion',
-    } as unknown as GroqChatResponse;
-  }
-
-  if (content.includes('hashtag')) {
-    return {
-      id: 'mock-groq-4',
-      choices: [
-        {
-          index: 0,
           finish_reason: 'stop',
-          logprobs: null,
-          message: {
-            role: 'assistant',
-            content: '#ai #automation #futuretech #innovation',
-          },
         },
       ],
-      created: Date.now(),
-      model: 'llama-3.1-8b-instant',
-      object: 'chat.completion',
-    } as unknown as GroqChatResponse;
+    } as GroqChatResponse;
   }
 
   return {
-    id: 'mock-groq-5',
+    id: 'mock-groq-id',
+    object: 'chat.completion',
+    created: Date.now(),
+    model: 'llama-3.1-8b-instant',
     choices: [
       {
         index: 0,
-        finish_reason: 'stop',
-        logprobs: null,
         message: {
           role: 'assistant',
-          content: '<h2>Insightful Article Section</h2><p>High quality content generated deterministically for testing.</p>',
+          content: '<h2>Groq Section Title</h2><p>Deterministic Groq response content for unit tests.</p>',
         },
+        finish_reason: 'stop',
       },
     ],
-    created: Date.now(),
-    model: 'llama-3.3-70b-versatile',
-    object: 'chat.completion',
-  } as unknown as GroqChatResponse;
+  } as GroqChatResponse;
 });
