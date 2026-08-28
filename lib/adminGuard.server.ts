@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { logger } from './logger';
+import { isUserAdmin } from './env';
 
 export interface AdminAuthResult {
   authorized: boolean;
@@ -41,13 +42,7 @@ export async function requireServerAdmin(): Promise<AdminAuthResult> {
       };
     }
 
-    const rawAdminEmails = process.env.ADMIN_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || '';
-    const adminList = rawAdminEmails
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    const isAdmin = adminList.includes(userEmail);
+    const isAdmin = isUserAdmin(userEmail);
 
     if (!isAdmin) {
       logger.warn(`Forbidden API access attempt by non-admin: ${userEmail}`, 'AUTH_SERVER');

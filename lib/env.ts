@@ -72,10 +72,13 @@ export function getAvailableAIProviders(): { groq: boolean; gemini: boolean; ope
  */
 export function isUserAdmin(email?: string | null): boolean {
   if (!email) return false;
-  const rawAdminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? env.NEXT_PUBLIC_ADMIN_EMAILS ?? '';
+  const rawAdminEmails = process.env.ADMIN_EMAILS ?? process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? env.NEXT_PUBLIC_ADMIN_EMAILS ?? '';
   const adminList = rawAdminEmails
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+  if (adminList.length === 0 && process.env.NODE_ENV === 'development') {
+    return true;
+  }
   return adminList.includes(email.trim().toLowerCase());
 }
