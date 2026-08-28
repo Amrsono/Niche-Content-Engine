@@ -60,19 +60,35 @@ export async function callAIWithFallback(
     }
   }
 
-  // 2. Try Gemini (Secondary Fallback)
+  // 2. Try Gemini (Secondary Fallback with auto-retry for 429 RPM limits)
   const activeGeminiKey = await getActiveGeminiApiKey();
   if (Date.now() > providerCooldowns.gemini && activeGeminiKey) {
-    try {
-      logger.info('Calling secondary fallback provider: Gemini...', 'AI');
-      const prompt = (options.messages || [])
-        .map((m: { role?: string; content?: unknown }) => `${m.role || 'user'}: ${String(m.content || '')}`)
-        .join('\n');
-      const text = await callGeminiProvider(prompt, GEMINI_MODELS.FLASH);
-      if (text) return { text };
-    } catch (gemError: unknown) {
-      setProviderCooldown('gemini');
-      logger.error('Gemini fallback failed', 'AI', gemError);
+    let geminiAttempts = 0;
+    const MAX_GEMINI_ATTEMPTS = 2;
+
+    while (geminiAttempts < MAX_GEMINI_ATTEMPTS) {
+      try {
+        logger.info('Calling secondary fallback provider: Gemini...', 'AI');
+        const prompt = (options.messages || [])
+          .map((m: { role?: string; content?: unknown }) => `${m.role || 'user'}: ${String(m.content || '')}`)
+          .join('\n');
+        const text = await callGeminiProvider(prompt, GEMINI_MODELS.FLASH);
+        if (text) return { text };
+      } catch (gemError: unknown) {
+        geminiAttempts++;
+        const errStr = stringifyError(gemError);
+        const isRateLimit = errStr.includes('429') || errStr.includes('quota') || errStr.includes('RATE_LIMIT');
+
+        if (isRateLimit && geminiAttempts < MAX_GEMINI_ATTEMPTS) {
+          logger.warn(`Gemini 429 rate limit encountered. Pausing 8s before retry (Attempt ${geminiAttempts}/${MAX_GEMINI_ATTEMPTS})...`, 'AI');
+          await delay(8000);
+          continue;
+        }
+
+        setProviderCooldown('gemini', 30000);
+        logger.error('Gemini fallback failed', 'AI', gemError);
+        break;
+      }
     }
   }
 
