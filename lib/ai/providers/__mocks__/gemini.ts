@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 
 export const GEMINI_MODELS = {
-  FLASH: 'gemini-2.0-flash',
+  FLASH: 'gemini-1.5-flash',
   PRO: 'gemini-1.5-pro',
 } as const;
 

@@ -4,6 +4,7 @@ import { requireServerAdmin } from '@/lib/adminGuard.server';
 import { getSettings } from '@/lib/storage';
 import { env } from '@/lib/env';
 import { stringifyError } from '@/lib/ai/utils';
+import { GEMINI_MODELS } from '@/lib/ai/providers/gemini';
 
 export async function POST(req: Request) {
   const authRes = await requireServerAdmin();
@@ -30,14 +31,28 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(targetKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    
-    const result = await model.generateContent("Hello, verify API connection.");
+    let modelName = GEMINI_MODELS.FLASH;
+    let result;
+
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      result = await model.generateContent("Hello, verify API connection.");
+    } catch (e: unknown) {
+      const errStr = String(e);
+      if (errStr.includes('404') || errStr.includes('not found') || errStr.includes('no longer available')) {
+        modelName = GEMINI_MODELS.PRO;
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent("Hello, verify API connection.");
+      } else {
+        throw e;
+      }
+    }
+
     const responseText = result.response.text();
 
     return NextResponse.json({
       success: true,
-      message: 'Successfully connected to Gemini 2.0 Flash!',
+      message: `Successfully connected to Gemini API (${modelName})!`,
       sampleResponse: responseText.slice(0, 100),
     });
   } catch (error) {
