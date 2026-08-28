@@ -62,9 +62,9 @@ export async function callAIWithFallback(
 
   // 2. Try Gemini (Secondary Fallback with auto-retry for transient errors/rate limits)
   const activeGeminiKey = await getActiveGeminiApiKey();
-  if (Date.now() > providerCooldowns.gemini && activeGeminiKey) {
+  if (activeGeminiKey) {
     let geminiAttempts = 0;
-    const MAX_GEMINI_ATTEMPTS = 3;
+    const MAX_GEMINI_ATTEMPTS = 4;
 
     while (geminiAttempts < MAX_GEMINI_ATTEMPTS) {
       try {
@@ -79,13 +79,12 @@ export async function callAIWithFallback(
         const errStr = stringifyError(gemError);
 
         if (geminiAttempts < MAX_GEMINI_ATTEMPTS) {
-          logger.warn(`Gemini attempt ${geminiAttempts} failed (${errStr.slice(0, 150)}). Pausing 10s before retry...`, 'AI');
-          await delay(10000);
+          logger.warn(`Gemini attempt ${geminiAttempts} failed (${errStr.slice(0, 120)}). Pausing 8s before retry...`, 'AI');
+          await delay(8000);
           continue;
         }
 
-        setProviderCooldown('gemini', 15000);
-        logger.error('Gemini fallback failed after retries', 'AI', gemError);
+        logger.error('Gemini fallback failed after all retries', 'AI', gemError);
         break;
       }
     }
