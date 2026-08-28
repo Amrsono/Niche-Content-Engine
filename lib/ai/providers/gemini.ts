@@ -4,8 +4,8 @@ import { env } from '../../env';
 import { getSettings } from '../../storage';
 
 export const GEMINI_MODELS = {
-  FLASH: 'gemini-1.5-flash',
-  PRO: 'gemini-1.5-pro',
+  FLASH: 'gemini-2.5-flash',
+  PRO: 'gemini-3.1-pro-preview',
 };
 
 export async function getActiveGeminiApiKey(): Promise<string> {
@@ -39,7 +39,7 @@ export async function callGeminiProvider(
   } catch (error: unknown) {
     const errStr = String(error);
     if (modelName === GEMINI_MODELS.FLASH && (errStr.includes('404') || errStr.includes('not found') || errStr.includes('no longer available'))) {
-      logger.warn(`Gemini model ${modelName} returned 404, retrying with ${GEMINI_MODELS.PRO}...`, 'GEMINI');
+      logger.warn(`Gemini model ${modelName} returned error, retrying with ${GEMINI_MODELS.PRO}...`, 'GEMINI');
       const fallbackModel = client.getGenerativeModel({ model: GEMINI_MODELS.PRO });
       const fallbackResult = await fallbackModel.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],

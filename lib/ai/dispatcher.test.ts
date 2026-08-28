@@ -26,7 +26,7 @@ vi.mock('./providers/groq', () => {
 vi.mock('./providers/gemini', () => {
   return {
     GEMINI_MODELS: {
-      FLASH: 'gemini-1.5-flash',
+      FLASH: 'gemini-2.5-flash',
       PRO: 'gemini-1.5-pro',
     },
     callGeminiProvider: vi.fn(),

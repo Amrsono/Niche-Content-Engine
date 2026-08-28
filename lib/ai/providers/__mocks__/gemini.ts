@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
 
 export const GEMINI_MODELS = {
-  FLASH: 'gemini-1.5-flash',
-  PRO: 'gemini-1.5-pro',
+  FLASH: 'gemini-2.5-flash',
+  PRO: 'gemini-3.1-pro-preview',
 } as const;
 
 export const callGeminiProvider = vi.fn(async (prompt: string): Promise<string> => {
