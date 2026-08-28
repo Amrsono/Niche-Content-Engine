@@ -60,7 +60,7 @@ export async function callAIWithFallback(
     }
   }
 
-  // 2. Try Gemini (Secondary Fallback with auto-retry for 429 RPM limits)
+  // 2. Try Gemini (Secondary Fallback with auto-retry for transient errors/rate limits)
   const activeGeminiKey = await getActiveGeminiApiKey();
   if (Date.now() > providerCooldowns.gemini && activeGeminiKey) {
     let geminiAttempts = 0;
@@ -77,16 +77,15 @@ export async function callAIWithFallback(
       } catch (gemError: unknown) {
         geminiAttempts++;
         const errStr = stringifyError(gemError);
-        const isRateLimit = errStr.includes('429') || errStr.includes('quota') || errStr.includes('RATE_LIMIT');
 
-        if (isRateLimit && geminiAttempts < MAX_GEMINI_ATTEMPTS) {
-          logger.warn(`Gemini 429 rate limit encountered. Pausing 8s before retry (Attempt ${geminiAttempts}/${MAX_GEMINI_ATTEMPTS})...`, 'AI');
-          await delay(8000);
+        if (geminiAttempts < MAX_GEMINI_ATTEMPTS) {
+          logger.warn(`Gemini attempt ${geminiAttempts} failed (${errStr.slice(0, 150)}). Pausing 10s before retry...`, 'AI');
+          await delay(10000);
           continue;
         }
 
         setProviderCooldown('gemini', 15000);
-        logger.error('Gemini fallback failed', 'AI', gemError);
+        logger.error('Gemini fallback failed after retries', 'AI', gemError);
         break;
       }
     }
