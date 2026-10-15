@@ -4,10 +4,13 @@ import { stringifyError, delay } from './utils';
 import { callGroqProvider, GROQ_MODELS, type GroqChatParams } from './providers/groq';
 import { callGeminiProvider, GEMINI_MODELS, getActiveGeminiApiKey } from './providers/gemini';
 import { callOpenAIProvider, OPENAI_MODELS } from './providers/openai';
+import { callOllamaProvider, isOllamaAvailable } from './providers/ollama';
+import { getSettings } from '../storage';
 import type OpenAI from 'openai';
 
 // Global Provider Cooldowns
 export const providerCooldowns: Record<string, number> = {
+  ollama: 0,
   groq: 0,
   gemini: 0,
   openai: 0,
@@ -16,22 +19,23 @@ export const providerCooldowns: Record<string, number> = {
 export const COOLDOWN_DURATION = 60000; // 60 seconds
 
 export function resetProviderCooldowns(): void {
+  providerCooldowns.ollama = 0;
   providerCooldowns.groq = 0;
   providerCooldowns.gemini = 0;
   providerCooldowns.openai = 0;
 }
 
-export function isProviderCoolingDown(provider: 'groq' | 'gemini' | 'openai'): boolean {
+export function isProviderCoolingDown(provider: 'ollama' | 'groq' | 'gemini' | 'openai'): boolean {
   return Date.now() < (providerCooldowns[provider] || 0);
 }
 
-export function setProviderCooldown(provider: 'groq' | 'gemini' | 'openai', durationMs: number = COOLDOWN_DURATION): void {
+export function setProviderCooldown(provider: 'ollama' | 'groq' | 'gemini' | 'openai', durationMs: number = COOLDOWN_DURATION): void {
   providerCooldowns[provider] = Date.now() + durationMs;
 }
 
 /**
  * Universal Multi-Provider AI Fallback Dispatcher
- * Priority: Groq -> Gemini -> OpenAI
+ * Priority: Local Ollama (if available) -> Groq -> Gemini -> OpenAI
  */
 export async function callAIWithFallback(
   options: GroqChatParams
@@ -47,7 +51,34 @@ export async function callAIWithFallback(
     logger.debug(`Using FAST_MODEL (${GROQ_MODELS.FAST}) for simple task`, 'AI');
   }
 
-  // 1. Try Groq (Primary)
+  // 0. Try Local Ollama (First priority for zero-cost, private offline inference)
+  const ollamaSetting = await getSettings<boolean>('OLLAMA_ENABLED');
+  const isOllamaUserEnabled = ollamaSetting !== false;
+
+  if (isOllamaUserEnabled && Date.now() > providerCooldowns.ollama) {
+    const isAvail = await isOllamaAvailable();
+    if (isAvail) {
+      try {
+        const storedModel = await getSettings<string>('OLLAMA_MODEL');
+        const activeModel = storedModel || process.env.OLLAMA_MODEL || 'llama3.2:latest';
+        const isJson = options.response_format?.type === 'json_object' ||
+          (options.messages || []).some(m => typeof m.content === 'string' && (m.content.toLowerCase().includes('return json') || m.content.toLowerCase().includes('as json') || m.content.toLowerCase().includes('in json')));
+        logger.info(`Calling local Ollama (${activeModel})${isJson ? ' [JSON mode]' : ''}...`, 'AI');
+        const res = await callOllamaProvider({
+          model: activeModel,
+          messages: options.messages as { role: string; content: string }[],
+          max_tokens: options.max_tokens || undefined,
+          format: isJson ? 'json' : undefined,
+        });
+        if (res.text) return { text: res.text };
+      } catch (ollamaErr: unknown) {
+        setProviderCooldown('ollama', 15000);
+        logger.warn(`Local Ollama failed (${stringifyError(ollamaErr)}). Falling back to cloud...`, 'AI');
+      }
+    }
+  }
+
+  // 1. Try Groq (Primary Cloud)
   const hasGroqKey = Boolean(env.GROQ_API_KEY || process.env.GROQ_API_KEY);
   if (Date.now() > providerCooldowns.groq && hasGroqKey) {
     try {

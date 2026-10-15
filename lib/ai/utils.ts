@@ -56,11 +56,16 @@ export function safeJsonParse<T = unknown>(content: string, context = "AI respon
     try {
       return JSON.parse(candidate) as T;
     } catch {
-      // Failed candidate
+      try {
+        const cleaned = candidate.replace(/,\s*([}\]])/g, '$1');
+        return JSON.parse(cleaned) as T;
+      } catch {
+        // Failed candidate
+      }
     }
   }
 
-  throw new Error(`Invalid JSON response from AI while processing ${context}.`);
+  throw new Error(`Invalid JSON response from AI while processing ${context}. Raw preview: ${trimmed.slice(0, 150)}`);
 }
 
 /**

@@ -9,7 +9,7 @@ import { delay, stringifyError } from './ai/utils';
 import { getTikTokToken } from './tiktok/token';
 import { generateSocialCaption } from './social/captions';
 import type { DraftArticle, PublishResult } from './agents';
-import { savePost } from './storage';
+import { savePost, getSettings } from './storage';
 
 // --------------------------------------------------------------------------
 // Local Pulse Blog
@@ -73,8 +73,11 @@ export async function publishToInstagram(
   article: DraftArticle,
   blogUrl?: string
 ): Promise<PublishResult> {
-  const businessId = (env.INSTAGRAM_BUSINESS_ACCOUNT_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '').trim();
-  const token = (env.INSTAGRAM_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN || '').trim().replace(/['\"]+/g, '');
+  const storedIgBusinessId = await getSettings<string>('INSTAGRAM_BUSINESS_ACCOUNT_ID');
+  const businessId = (storedIgBusinessId || env.INSTAGRAM_BUSINESS_ACCOUNT_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '').trim();
+  const storedIgToken = await getSettings<string>('INSTAGRAM_ACCESS_TOKEN');
+  const storedFbToken = await getSettings<string>('FACEBOOK_PAGE_ACCESS_TOKEN');
+  const token = (storedIgToken || storedFbToken || env.INSTAGRAM_ACCESS_TOKEN || process.env.INSTAGRAM_ACCESS_TOKEN || env.FACEBOOK_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '').trim().replace(/['"]+/g, '');
 
   if (!businessId || !token) {
     return {
@@ -252,11 +255,13 @@ export async function publishToFacebook(
   article: DraftArticle,
   blogUrl?: string
 ): Promise<PublishResult> {
-  const pageId = (env.FACEBOOK_PAGE_ID || process.env.FACEBOOK_PAGE_ID || '').trim();
-  const token = (env.FACEBOOK_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '').trim().replace(/['\"]+/g, '');
+  const storedPageId = await getSettings<string>('FACEBOOK_PAGE_ID');
+  const pageId = (storedPageId || env.FACEBOOK_PAGE_ID || process.env.FACEBOOK_PAGE_ID || '').trim();
+  const storedFbToken = await getSettings<string>('FACEBOOK_PAGE_ACCESS_TOKEN');
+  const token = (storedFbToken || env.FACEBOOK_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '').trim().replace(/['\"]+/g, '');
 
   if (!pageId || !token) {
-    return { status: 'skipped', message: 'Facebook credentials missing.', platform: 'Facebook' };
+    return { status: 'skipped', message: 'Facebook credentials missing. Configure them in Settings or .env.local', platform: 'Facebook' };
   }
 
   try {
