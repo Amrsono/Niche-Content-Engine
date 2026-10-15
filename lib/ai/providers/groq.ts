@@ -3,9 +3,9 @@ import { logger } from '../../logger';
 import { env } from '../../env';
 
 export const GROQ_MODELS = {
-  DISCOVERY: 'llama3-8b-8192',
-  REASONING: 'llama-3.3-70b-versatile',
-  FAST: 'llama3-8b-8192',
+  DISCOVERY: 'qwen/qwen3.8-27b',
+  REASONING: 'qwen/qwen3.8-27b',
+  FAST: 'openai/gpt-oss-20b',
 };
 
 export type GroqChatParams = Parameters<Groq['chat']['completions']['create']>[0];
