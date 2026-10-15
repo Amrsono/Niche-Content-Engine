@@ -1,12 +1,16 @@
 import { z } from 'zod';
 
 export const BatchRequestSchema = z.object({
-  niche: z.string().min(1, 'Niche is required'),
-  count: z.number().int().min(1).max(20).default(5),
+  niche: z.string().optional().default('AI & Future Tech'),
+  count: z.number().int().min(1).max(50).default(30),
+  autoSocial: z.boolean().optional().default(true),
+  autoIndex: z.boolean().optional().default(true),
 });
 
 export const ScraperRequestSchema = z.object({
   niche: z.string().optional().default('All Trends'),
+  count: z.number().int().min(1).max(50).default(20),
+  discoverOnly: z.boolean().optional().default(false),
 });
 
 export const IndexingRequestSchema = z.object({
@@ -17,6 +21,12 @@ export const IndexingRequestSchema = z.object({
 export const SocialSignalRequestSchema = z.object({
   platform: z.enum(['instagram', 'twitter', 'tiktok', 'facebook']),
   slug: z.string().min(1, 'Slug is required'),
+});
+
+export const BatchSocialRequestSchema = z.object({
+  slugs: z.array(z.string()).optional(),
+  platforms: z.array(z.enum(['facebook', 'instagram', 'twitter', 'tiktok'])).optional(),
+  limit: z.number().int().min(1).max(50).default(10),
 });
 
 export const DiagnosticRequestSchema = z.object({

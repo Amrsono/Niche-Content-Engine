@@ -8,6 +8,8 @@ interface BatchItemResult {
   title?: string;
   url?: string;
   indexing?: boolean;
+  facebook?: string;
+  instagram?: string;
   error?: string;
 }
 
@@ -22,7 +24,7 @@ export function PulseTerminal() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [niche, setNiche] = useState(''); // Ensure blank by default
   const [isBulk, setIsBulk] = useState(false);
-  const [bulkCount, setBulkCount] = useState(5);
+  const [bulkCount, setBulkCount] = useState(30);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const addLog = (text: string, type: LogEntry['type'] = 'info') => {
@@ -39,15 +41,16 @@ export function PulseTerminal() {
     setIsProcessing(true);
     setLogs([]);
     
-    addLog(`Initiating ${isBulk ? 'BULK ' : ''}autonomous cycle for niche: ${niche}`, 'system');
+    addLog(`Initiating ${isBulk ? 'BULK ' : ''}autonomous cycle for niche: ${niche || 'AI & Future Tech'}`, 'system');
 
     try {
       if (isBulk) {
-        addLog(`[BATCH] Queuing ${bulkCount} articles for generation...`, 'info');
+        addLog(`[BATCH] Queuing ${bulkCount} articles for generation + social signals...`, 'info');
+        addLog(`[BATCH] Auto-Index: ON | Auto-Social (FB + IG): ON`, 'info');
         const response = await fetch('/api/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ niche, count: bulkCount }),
+          body: JSON.stringify({ niche: niche || undefined, count: bulkCount, autoSocial: true, autoIndex: true }),
         });
         const data = await response.json();
         
@@ -57,7 +60,17 @@ export function PulseTerminal() {
               addLog(`[ERROR] ${res.keyword}: ${res.error}`, 'error');
             } else {
               addLog(`[SUCCESS] Generated: "${res.title}"`, 'success');
-              if (res.indexing) addLog(`[INDEXING] Google notified via API.`, 'info');
+              if (res.indexing) addLog(`  ⚡ [INDEXING] Google notified via Fast-Track API`, 'info');
+              if (res.facebook && !res.facebook.includes('skipped') && !res.facebook.includes('error') && !res.facebook.includes('missing')) {
+                addLog(`  📘 [FACEBOOK] Posted → ${res.facebook}`, 'success');
+              } else {
+                addLog(`  📘 [FACEBOOK] ${res.facebook || 'skipped'}`, 'info');
+              }
+              if (res.instagram && !res.instagram.includes('skipped') && !res.instagram.includes('error') && !res.instagram.includes('missing')) {
+                addLog(`  📸 [INSTAGRAM] Posted → ${res.instagram}`, 'success');
+              } else {
+                addLog(`  📸 [INSTAGRAM] ${res.instagram || 'skipped'}`, 'info');
+              }
             }
           });
           const successCount = data.results.filter((r: BatchItemResult) => !r.error).length;

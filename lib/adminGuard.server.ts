@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import { logger } from './logger';
 import { isUserAdmin } from './env';
 
@@ -16,6 +17,17 @@ export interface AdminAuthResult {
  */
 export async function requireServerAdmin(): Promise<AdminAuthResult> {
   try {
+    // Allow CRON_SECRET bearer token to bypass Clerk auth (for automated scripts & CLI tests)
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const headersList = await headers();
+      const authHeader = headersList.get('authorization');
+      if (authHeader === `Bearer ${cronSecret}`) {
+        logger.info('Admin access granted via CRON_SECRET bearer token', 'AUTH_SERVER');
+        return { authorized: true, userEmail: 'cron-bot@system' };
+      }
+    }
+
     const session = await auth();
     if (!session.userId) {
       logger.warn('Unauthorized API access attempt (no session userId)', 'AUTH_SERVER');

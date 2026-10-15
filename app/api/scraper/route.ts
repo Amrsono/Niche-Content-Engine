@@ -12,12 +12,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
 
-    const { niche } = validation.data;
+    const { niche, count, discoverOnly } = validation.data;
     
     // 1. Discovery Phase
-    const trends = await runTrendScraper(niche || 'All Trends');
+    const trends = await runTrendScraper(niche || 'All Trends', count);
     if (trends.length === 0) {
-      return NextResponse.json({ message: "No high-growth, low-comp keywords found." });
+      return NextResponse.json({ success: false, message: "No high-growth, low-comp keywords found." });
+    }
+
+    // If discoverOnly mode, return the keywords directly without generating an article
+    if (discoverOnly) {
+      return NextResponse.json({
+        success: true,
+        message: `Discovered ${trends.length} low-hanging fruit keywords for niche: ${niche || 'All Trends'}`,
+        count: trends.length,
+        niche: niche || 'All Trends',
+        trends,
+      });
     }
     
     const targetKeyword = trends[0].keyword;

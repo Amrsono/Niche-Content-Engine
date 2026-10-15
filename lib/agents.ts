@@ -8,6 +8,7 @@ import { GROQ_MODELS } from './ai/providers/groq';
 import { getTikTokToken } from './tiktok/token';
 import { callAIWithFallback } from './ai/dispatcher';
 import { generateHashtags, generateSocialCaption } from './social/captions';
+import { addDiscoveredTopics } from './niche-manager';
 
 // Re-export publisher functions from dedicated module (see lib/publishers.ts)
 export {
@@ -53,9 +54,10 @@ export interface PublishResult {
   message?: string;
 }
 
-// 1. Discovery Agent
-export async function runTrendScraper(niche: string): Promise<TrendData[]> {
-  logger.info(`Starting real-time scrape for niche: ${niche}`, 'DISCOVERY');
+// 1. Discovery Agent: Scrape & synthesize low-hanging fruit keywords
+export async function runTrendScraper(niche: string, targetCount: number = 20): Promise<TrendData[]> {
+  const count = Math.max(1, Math.min(50, targetCount));
+  logger.info(`Starting real-time scrape for niche: ${niche} (Target: ${count} low-hanging fruit keywords)`, 'DISCOVERY');
   let googleTrends: unknown[] = [];
   let tiktokTrends: unknown[] = [];
 
@@ -64,7 +66,7 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
     tiktokTrends = await scrapeTikTokTrends().catch(() => []);
 
     const rawData = JSON.stringify({
-      google: (googleTrends || []).slice(0, 5),
+      google: (googleTrends || []).slice(0, 20),
       tiktok: tiktokTrends || [],
     });
 
@@ -72,11 +74,18 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert SEO analyst. I will provide raw trending data. Pick the top 3 high-growth, low-competition keywords for a blog in JSON format.',
+          content: `You are an expert SEO strategist specializing in AdSense-monetized content.
+Your mission: Given trending seeds and a target niche, identify exactly ${count} "low-hanging fruit" keywords.
+Criteria for low-hanging fruit:
+- Long-tail search queries (3-6 words)
+- High search intent (questions, step-by-step guides, reviews, best tools, comparisons)
+- Low SEO keyword difficulty / competition (easy to rank on page 1 overnight)
+- High Google AdSense RPM potential
+Return JSON with 'trends': array of objects { "keyword": string, "searchVolume": number (between 1000 and 15000), "competition": "LOW" }.`,
         },
         {
           role: 'user',
-          content: `Niche: "${niche}". Raw Data: ${rawData}. Return JSON with 'trends' (keyword, searchVolume, competition: LOW/MEDIUM/HIGH).`,
+          content: `Niche: "${niche}". Trending Context: ${rawData}. Generate ${count} low-hanging fruit keywords.`,
         },
       ],
       model: GROQ_MODELS.DISCOVERY,
@@ -85,30 +94,82 @@ export async function runTrendScraper(niche: string): Promise<TrendData[]> {
 
     const data = safeJsonParse<{ trends: TrendData[] }>(res.text, 'Trend Scraper');
     if (data.trends && data.trends.length > 0) {
-      return data.trends.map((t) => ({ ...t, niche }));
+      const formatted = data.trends.slice(0, count).map((t) => ({
+        ...t,
+        competition: 'LOW' as const,
+        niche,
+      }));
+      // Persist discovered topics
+      addDiscoveredTopics(formatted.map((t) => t.keyword)).catch(() => {});
+      return formatted;
     }
   } catch (err: unknown) {
     logger.warn('AI analysis of raw trends failed, deploying direct trend parser fallback...', 'DISCOVERY', err);
   }
 
-  // Resilient Direct Parser Fallback
+  // Resilient Direct Parser & Long-Tail Expander Fallback to guarantee count keywords
   const fallbackTrends: TrendData[] = [];
-  if (Array.isArray(googleTrends) && googleTrends.length > 0) {
-    googleTrends.slice(0, 5).forEach((t: unknown) => {
+  const seen = new Set<string>();
+
+  const addKeyword = (kw: string, vol: number) => {
+    const clean = kw.trim();
+    if (clean && !seen.has(clean.toLowerCase())) {
+      seen.add(clean.toLowerCase());
+      fallbackTrends.push({ keyword: clean, searchVolume: vol, competition: 'LOW', niche });
+    }
+  };
+
+  if (Array.isArray(googleTrends)) {
+    googleTrends.forEach((t: unknown) => {
       const keyword = typeof t === 'string' ? t : (t as { title?: string; keyword?: string })?.title || (t as { keyword?: string })?.keyword;
       if (keyword && typeof keyword === 'string') {
-        fallbackTrends.push({ keyword, searchVolume: 5000, competition: 'LOW', niche });
+        addKeyword(keyword, 5000);
       }
     });
   }
 
-  if (fallbackTrends.length === 0) {
-    fallbackTrends.push({ keyword: niche, searchVolume: 10000, competition: 'LOW', niche });
-    fallbackTrends.push({ keyword: `${niche} news & updates`, searchVolume: 8000, competition: 'LOW', niche });
-    fallbackTrends.push({ keyword: `${niche} complete guide`, searchVolume: 6000, competition: 'LOW', niche });
+  // Long-tail templates to guarantee full count of low-hanging fruit keywords
+  const templates = [
+    `best ${niche} tools for beginners`,
+    `how to use ${niche} step by step`,
+    `${niche} vs alternatives in 2026`,
+    `top affordable ${niche} products`,
+    `${niche} setup tutorial for productivity`,
+    `is ${niche} worth it full review`,
+    `how to save money with ${niche}`,
+    `${niche} tips and tricks that actually work`,
+    `future of ${niche} in 2026`,
+    `top 10 ${niche} mistakes to avoid`,
+    `${niche} workflow automation guide`,
+    `beginner guide to ${niche} optimization`,
+    `${niche} software comparison chart`,
+    `how to monetize ${niche} content`,
+    `${niche} best practices for small businesses`,
+    `free vs paid ${niche} tools`,
+    `essential ${niche} checklist for 2026`,
+    `${niche} case study and results`,
+    `how to troubleshoot common ${niche} issues`,
+    `ultimate ${niche} roadmap for creators`,
+    `${niche} for passive income guide`,
+    `hidden secrets of ${niche} revealed`,
+    `complete beginner walkthrough for ${niche}`,
+    `best budget equipment for ${niche}`,
+    `daily routine with ${niche} for max results`,
+    `why most people fail at ${niche}`,
+    `top 5 alternatives to popular ${niche}`,
+    `how fast can you learn ${niche}`,
+    `practical tips for mastering ${niche}`,
+    `real world examples of ${niche} success`,
+  ];
+
+  for (const tpl of templates) {
+    if (fallbackTrends.length >= count) break;
+    addKeyword(tpl, Math.floor(2000 + Math.random() * 8000));
   }
 
-  return fallbackTrends;
+  // Fallback persistence
+  addDiscoveredTopics(fallbackTrends.map((t) => t.keyword)).catch(() => {});
+  return fallbackTrends.slice(0, count);
 }
 
 // Helper to find affiliate products
